@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { getCategories } from "@/lib/api";
+import { getToken } from "@/utils/auth";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_BACKEND_URL ?? "http://localhost:5000";
 
@@ -23,9 +24,11 @@ const parseJsonResponse = async (response, fallbackMessage) => {
 };
 
 const createAdminProduct = async (formData) => {
+  const token = getToken();
   const response = await fetch(`${API_BASE_URL}/api/v1/admin/products`, {
     method: "POST",
     credentials: "include",
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
     body: formData,
   });
 

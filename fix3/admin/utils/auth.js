@@ -1,5 +1,12 @@
 // utils/auth.js - Authentication utilities for admin panel
 
+const CLIENT_TOKEN_COOKIE = 'admin-token-client';
+
+const getClientCookieMaxAge = () => {
+  const parsed = parseInt(process.env.NEXT_PUBLIC_ADMIN_TOKEN_MAX_AGE ?? '3600', 10);
+  return Number.isNaN(parsed) ? 3600 : parsed;
+};
+
 /**
  * Check if admin is authenticated
  * @returns {boolean}
@@ -9,7 +16,7 @@ export const isAuthenticated = () => {
   
   const token = localStorage.getItem('adminToken') || 
                 localStorage.getItem('admin-token');
-  const cookieToken = getCookie('admin-token');
+  const cookieToken = getCookie(CLIENT_TOKEN_COOKIE);
   
   return !!(token || cookieToken);
 };
@@ -23,7 +30,7 @@ export const getToken = () => {
   
   return localStorage.getItem('adminToken') || 
          localStorage.getItem('admin-token') || 
-         getCookie('admin-token');
+         getCookie(CLIENT_TOKEN_COOKIE);
 };
 
 /**
@@ -55,6 +62,7 @@ export const saveAuthData = (token, user) => {
     // Store in both locations for compatibility
     localStorage.setItem('adminToken', token);
     localStorage.setItem('admin-token', token);
+    document.cookie = `${CLIENT_TOKEN_COOKIE}=${token}; path=/; max-age=${getClientCookieMaxAge()}; sameSite=Lax`;
   }
   
   if (user) {
@@ -74,6 +82,7 @@ export const clearAuthData = () => {
   
   // Also clear cookies
   document.cookie = 'admin-token=; path=/; expires=Thu, 01 Jan 1970 00:00:01 GMT;';
+  document.cookie = `${CLIENT_TOKEN_COOKIE}=; path=/; expires=Thu, 01 Jan 1970 00:00:01 GMT;`;
 };
 
 /**

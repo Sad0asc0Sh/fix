@@ -25,45 +25,44 @@ export default function RootLayout({ children }) {
   const [isLoading, setIsLoading] = useState(true);
   const [isAuthed, setIsAuthed] = useState(false);
 
+  // Set client-side flag
   useEffect(() => {
     setIsClient(true);
   }, []);
 
+  // Authentication check - runs only once when client is ready or pathname changes
   useEffect(() => {
-    if (isClient) {
-      // Don't check auth on login page
-      if (pathname === '/login') {
-        setIsLoading(false);
-        return;
-      }
+    if (!isClient) return;
 
-      // Check authentication
-      const checkAuth = () => {
-        const authenticated = isAuthenticated();
-        
-        console.log('Auth check:', {
-          pathname,
-          authenticated,
-          adminToken: localStorage.getItem('adminToken'),
-          adminToken2: localStorage.getItem('admin-token'),
-          cookie: document.cookie,
-          user: getAdminUser()
-        });
-
-        if (!authenticated) {
-          console.log('Not authenticated, redirecting to login...');
-          router.push('/login');
-        } else {
-          setIsAuthed(true);
-        }
-        setIsLoading(false);
-      };
-
-      // Small delay to ensure localStorage is properly set after login
-      const timer = setTimeout(checkAuth, 100);
-      return () => clearTimeout(timer);
+    // Don't check auth on login page
+    if (pathname === '/login') {
+      setIsLoading(false);
+      setIsAuthed(false);
+      return;
     }
-  }, [pathname, router, isClient]);
+
+    // Check authentication
+    const authenticated = isAuthenticated();
+    
+    console.log('Auth check:', {
+      pathname,
+      authenticated,
+      adminToken: localStorage.getItem('adminToken'),
+      adminToken2: localStorage.getItem('admin-token'),
+      user: getAdminUser()
+    });
+
+    if (!authenticated) {
+      console.log('Not authenticated, redirecting to login...');
+      setIsAuthed(false);
+      setIsLoading(false);
+      router.replace('/login');
+    } else {
+      console.log('User is authenticated');
+      setIsAuthed(true);
+      setIsLoading(false);
+    }
+  }, [pathname, isClient]); // Removed router from dependencies to prevent loop
 
   // Don't render protected layout for login page
   if (pathname === '/login') {
@@ -72,7 +71,7 @@ export default function RootLayout({ children }) {
         <head>
           <title>ورود به پنل مدیریت</title>
         </head>
-        <body>
+        <body className={`${geistSans.variable} ${geistMono.variable}`}>
           <QueryProvider>{children}</QueryProvider>
         </body>
       </html>
@@ -80,13 +79,13 @@ export default function RootLayout({ children }) {
   }
 
   // Show loading while checking auth
-  if (isLoading && isClient) {
+  if (isLoading) {
     return (
       <html lang="fa" dir="rtl">
         <head>
           <title>در حال بارگذاری...</title>
         </head>
-        <body>
+        <body className={`${geistSans.variable} ${geistMono.variable}`}>
           <QueryProvider>
             <div className="flex items-center justify-center min-h-screen">
               <div className="text-center">
@@ -100,24 +99,20 @@ export default function RootLayout({ children }) {
     );
   }
 
-  // Render this for authenticated pages
+  // Render authenticated layout
   return (
     <html lang="fa" dir="rtl">
       <head>
         <title>پنل مدیریت فروشگاه</title>
       </head>
-      <body>
+      <body className={`${geistSans.variable} ${geistMono.variable}`}>
         <QueryProvider>
           {isAuthed ? (
             <div className="flex">
               <Sidebar />
               <main className="flex-grow">{children}</main>
             </div>
-          ) : (
-            <div className="flex items-center justify-center min-h-screen">
-              <p>Redirecting...</p>
-            </div>
-          )}
+          ) : null}
         </QueryProvider>
       </body>
     </html>

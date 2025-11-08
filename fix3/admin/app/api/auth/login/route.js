@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-// آدرس بک‌اند شما
+// Backend base URL (falls back to local dev server)
 const API_BASE_URL = process.env.NEXT_PUBLIC_BACKEND_URL ?? "http://localhost:5000";
 
 export async function POST(request) {
@@ -14,18 +14,18 @@ export async function POST(request) {
       );
     }
 
-    // ۱. تماس با بک‌اند واقعی
+    // Proxy credentials to the backend admin login endpoint
     const backendResponse = await fetch(`${API_BASE_URL}/api/auth/admin/login`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ email, password }),
-      cache: "no-store"
+      cache: "no-store",
     });
 
     let payload = null;
     try {
       payload = await backendResponse.json();
-    } catch (_) {
+    } catch {
       payload = null;
     }
 
@@ -36,8 +36,8 @@ export async function POST(request) {
       );
     }
 
-    // ۲. دریافت توکن و کاربر از پاسخ بک‌اند
-    // (بر اساس authController.js، بک‌اند 'accessToken' را برمی‌گرداند)
+    // Extract the access token + user payload from backend response
+    // (authController.js returns it as `accessToken`)
     const { accessToken, data } = payload || {};
     const user = data?.user;
 
@@ -49,24 +49,33 @@ export async function POST(request) {
       );
     }
 
-    // 🎯 تغییر اصلی اینجاست:
-    // ما توکن را مستقیماً در JSON به صفحه لاگین برمی‌گردانیم.
-    // این کار باعث می‌شود layout.js که از localStorage می‌خواند، به درستی کار کند.
-    return NextResponse.json({
-      user: user,
-      token: accessToken // <-- نام آن را 'token' می‌گذاریم تا با کد صفحه لاگین هماهنگ باشد
+    // Return the token JSON for the login page and set cookies so layout/localStorage stay in sync
+    const parsedMaxAge = parseInt(process.env.NEXT_PUBLIC_ADMIN_TOKEN_MAX_AGE ?? "3600", 10);
+    const tokenMaxAge = Number.isNaN(parsedMaxAge) ? 3600 : parsedMaxAge;
+
+    const response = NextResponse.json({
+      user,
+      token: accessToken,
     });
 
-    /*
-    // --- کد قبلی (و اشتباه) که کوکی httpOnly ست می‌کرد حذف شد ---
-    const response = NextResponse.json({ user });
     response.cookies.set("admin-token", accessToken, {
       httpOnly: true,
-      ...
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "lax",
+      path: "/",
+      maxAge: tokenMaxAge,
     });
+
+    // Client-readable cookie so layout/auth helpers can detect session without waiting for localStorage
+    response.cookies.set("admin-token-client", accessToken, {
+      httpOnly: false,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "lax",
+      path: "/",
+      maxAge: tokenMaxAge,
+    });
+
     return response;
-    */
-    
   } catch (error) {
     console.error("Login proxy error:", error);
     return NextResponse.json(

@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { FiEdit, FiTrash2 } from "react-icons/fi";
+import { getToken } from "@/utils/auth";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_BACKEND_URL ?? "http://localhost:5000";
 
@@ -23,9 +24,11 @@ const parseJsonResponse = async (response, fallbackMessage) => {
 };
 
 const fetchAdminProducts = async () => {
+  const token = getToken();
   const response = await fetch(`${API_BASE_URL}/api/v1/admin/products`, {
     credentials: "include",
     cache: "no-store",
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
   });
 
   const payload = await parseJsonResponse(response, "Failed to fetch admin products.");
@@ -33,9 +36,11 @@ const fetchAdminProducts = async () => {
 };
 
 const deleteAdminProduct = async (productId) => {
+  const token = getToken();
   const response = await fetch(`${API_BASE_URL}/api/v1/admin/products/${productId}`, {
     method: "DELETE",
     credentials: "include",
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
   });
 
   return parseJsonResponse(response, "Failed to delete product.");

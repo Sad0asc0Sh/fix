@@ -36,8 +36,6 @@ export default function AdminLoginPage() {
           // Handle the backend response format
           const data = backendResponse.data;
           if (data.accessToken) {
-            // Save auth data
-            saveAuthData(data.accessToken, data.data?.user);
             return {
               success: true,
               user: data.data?.user,
@@ -52,25 +50,29 @@ export default function AdminLoginPage() {
     onSuccess: (data) => {
       console.log("Login successful:", data);
       
-      // If we got a token from the backend directly
-      if (data.token || data.accessToken) {
-        saveAuthData(data.token || data.accessToken, data.user || data.data?.user);
-      }
+      // Save auth data to localStorage
+      const token = data.token || data.accessToken;
+      const user = data.user || data.data?.user;
       
-      // Debug authentication state after login
-      setTimeout(() => {
-        console.log('Post-login auth check:');
+      if (token) {
+        saveAuthData(token, user);
+        
+        // Debug authentication state after login
+        console.log('Post-login auth state:');
         console.log('adminToken:', localStorage.getItem('adminToken'));
         console.log('admin-token:', localStorage.getItem('admin-token'));
         console.log('adminUser:', localStorage.getItem('adminUser'));
-      }, 100);
-      
-      alert("ورود با موفقیت انجام شد!");
-      
-      // Add a small delay before redirect to ensure storage is complete
-      setTimeout(() => {
-        router.push("/");
-      }, 500);
+        
+        // Show success message
+        alert("ورود با موفقیت انجام شد!");
+        
+        // Use replace instead of push to prevent back button issues (small delay ensures storage/cookies are flushed)
+        setTimeout(() => {
+          router.replace("/");
+        }, 150);
+      } else {
+        setError("خطا: توکن احراز هویت دریافت نشد");
+      }
     },
     onError: (error) => {
       console.error("Admin login error:", error);
@@ -139,7 +141,7 @@ export default function AdminLoginPage() {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               disabled={mutation.isPending}
-              className="w-full px-3 py-2 mt-1 text-gray-900 bg-gray-50 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
+              className="w-full px-3 py-2 mt-1 text-gray-900 bg-gray-50 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 disabled:bg-gray-200 disabled:cursor-not-allowed"
               dir="ltr"
               placeholder="admin@example.com"
             />
@@ -158,7 +160,7 @@ export default function AdminLoginPage() {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               disabled={mutation.isPending}
-              className="w-full px-3 py-2 mt-1 text-gray-900 bg-gray-50 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
+              className="w-full px-3 py-2 mt-1 text-gray-900 bg-gray-50 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 disabled:bg-gray-200 disabled:cursor-not-allowed"
               dir="ltr"
               placeholder="********"
             />
@@ -168,7 +170,7 @@ export default function AdminLoginPage() {
             <button
               type="submit"
               disabled={mutation.isPending}
-              className="w-full px-4 py-2 text-lg font-medium text-white bg-indigo-600 border border-transparent rounded-md shadow-sm hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:bg-gray-400"
+              className="w-full px-4 py-2 text-lg font-medium text-white bg-indigo-600 border border-transparent rounded-md shadow-sm hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:bg-gray-400 disabled:cursor-not-allowed"
             >
               {mutation.isPending ? "در حال ورود..." : "ورود"}
             </button>
@@ -176,7 +178,8 @@ export default function AdminLoginPage() {
             <button
               type="button"
               onClick={fillTestAccount}
-              className="w-full px-4 py-2 text-sm text-gray-600 bg-gray-100 border border-gray-300 rounded-md hover:bg-gray-200"
+              disabled={mutation.isPending}
+              className="w-full px-4 py-2 text-sm text-gray-600 bg-gray-100 border border-gray-300 rounded-md hover:bg-gray-200 disabled:bg-gray-200 disabled:cursor-not-allowed"
             >
               پر کردن با حساب تست
             </button>
@@ -185,7 +188,7 @@ export default function AdminLoginPage() {
         
         <div className="mt-4 text-xs text-center text-gray-500">
           <p>برای ایجاد حساب ادمین:</p>
-          <ol className="mt-2 text-right">
+          <ol className="mt-2 text-right space-y-1">
             <li>1. از طریق Frontend یک کاربر ثبت‌نام کنید</li>
             <li>2. در MongoDB نقش کاربر را به admin تغییر دهید</li>
             <li>3. با همان اطلاعات وارد شوید</li>
