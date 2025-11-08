@@ -11,8 +11,8 @@ const nextConfig = {
   },
   
   async headers() {
-    // Content Security Policy configuration
-    // Using 'self' for connect-src since baseURL is /proxy-api
+    // 🎯 رفع مشکل: ما هدر CSP را فقط به صفحات اعمال می‌کنیم، نه به API
+    
     const cspRaw = `
       default-src 'self';
       script-src 'self' 'unsafe-eval' 'unsafe-inline';
@@ -23,7 +23,6 @@ const nextConfig = {
       font-src 'self';
     `;
     
-    // Clean up CSP string: remove extra whitespace and join properly
     const ContentSecurityPolicy = cspRaw
       .split('\n')
       .map(line => line.trim())
@@ -39,7 +38,9 @@ const nextConfig = {
 
     return [
       {
-        source: '/:path*',
+        // 🎯 این source تغییر کرده است تا فقط شامل صفحات شود
+        // و مسیرهای api, _next, image و favicon را نادیده بگیرد
+        source: '/((?!api|_next/static|_next/image|favicon.ico).*)',
         headers: securityHeaders,
       },
     ];
