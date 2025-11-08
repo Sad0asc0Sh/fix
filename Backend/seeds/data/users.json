@@ -1,0 +1,51 @@
+[
+  {
+    "name": "ادمین ولفویتا",
+    "email": "admin@welfvita.com",
+    "password": "Admin123",
+    "role": "admin",
+    "isActive": true,
+    "isEmailVerified": true
+  },
+  {
+    "name": "مدیر فروشگاه",
+    "email": "manager@welfvita.com",
+    "password": "Manager123",
+    "role": "manager",
+    "isActive": true,
+    "isEmailVerified": true
+  },
+  {
+    "name": "علی محمدی",
+    "email": "ali@test.com",
+    "password": "User123",
+    "role": "user",
+    "isActive": true,
+    "isEmailVerified": true,
+    "phone": "09121234567",
+    "address": {
+      "street": "خیابان آزادی، پلاک 123",
+      "city": "تهران",
+      "state": "تهران",
+      "postalCode": "1234567890",
+      "country": "ایران"
+    }
+  },
+  {
+    "name": "سارا احمدی",
+    "email": "sara@test.com",
+    "password": "User123",
+    "role": "user",
+    "isActive": true,
+    "isEmailVerified": true,
+    "phone": "09129876543"
+  },
+  {
+    "name": "رضا کریمی",
+    "email": "reza@test.com",
+    "password": "User123",
+    "role": "user",
+    "isActive": true,
+    "isEmailVerified": false
+  }
+]

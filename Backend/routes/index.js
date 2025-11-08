@@ -1,0 +1,295 @@
+/**
+ * ====================================
+ * Index Routes - مرکزی کردن تمام مسیرها
+ * ====================================
+ */
+
+const express = require('express');
+const router = express.Router();
+
+// ======================================================
+// Import Existing Routes
+// ======================================================
+const authRoutes = require('./authRoutes');
+const userRoutes = require('./userRoutes');
+const productRoutes = require('./productRoutes');
+const categoryRoutes = require('./categoryRoutes');
+const cartRoutes = require('./cartRoutes');
+const orderRoutes = require('./orderRoutes');
+const paymentRoutes = require('./paymentRoutes');
+const productReviewRoutes = require('./productReviewRoutes');
+const adminReviewRoutes = require('./adminReviewRoutes');
+const adminRoutes = require('./adminRoutes');
+const adminProductRoutes = require('./adminProductRoutes');
+
+// ======================================================
+// 🆕 Import New Routes
+// ======================================================
+const couponRoutes = require('./couponRoutes');
+const notificationRoutes = require('./notificationRoutes');
+const wishlistRoutes = require('./wishlistRoutes');
+const searchRoutes = require('./searchRoutes');
+
+// ======================================================
+// Mount Existing Routes
+// ======================================================
+
+// Authentication Routes
+router.use('/auth', authRoutes);
+
+// User Routes
+router.use('/users', userRoutes);
+
+// Product Routes
+router.use('/products', productRoutes);
+
+// Category Routes
+router.use('/categories', categoryRoutes);
+
+// Cart Routes
+router.use('/cart', cartRoutes);
+
+// Order Routes
+router.use('/orders', orderRoutes);
+
+// Payment Routes
+router.use('/payments', paymentRoutes);
+
+// Review Routes
+router.use('/reviews', productReviewRoutes);
+
+// Admin Review Routes
+router.use('/admin/reviews', adminReviewRoutes);
+
+// Admin Routes
+router.use('/admin', adminRoutes);
+router.use('/v1/admin/products', adminProductRoutes);
+
+// ======================================================
+// 🆕 Mount New Routes
+// ======================================================
+
+// Coupon Routes
+router.use('/coupons', couponRoutes);
+
+// Notification Routes
+router.use('/notifications', notificationRoutes);
+
+// Wishlist Routes
+router.use('/wishlist', wishlistRoutes);
+
+// Search Routes
+router.use('/search', searchRoutes);
+
+// ======================================================
+// Health Check Endpoint
+// ======================================================
+router.get('/health', (req, res) => {
+    res.status(200).json({
+        success: true,
+        message: 'API سالم است',
+        status: 'UP',
+        version: '1.1.0', // 🆕 Version updated
+        timestamp: new Date().toISOString(),
+        uptime: process.uptime(),
+        memory: {
+            total: Math.round(process.memoryUsage().heapTotal / 1024 / 1024) + ' MB',
+            used: Math.round(process.memoryUsage().heapUsed / 1024 / 1024) + ' MB'
+        },
+        routes: {
+            auth: '/api/auth',
+            users: '/api/users',
+            products: '/api/products',
+            categories: '/api/categories',
+            cart: '/api/cart',
+            orders: '/api/orders',
+            payments: '/api/payments',
+            reviews: '/api/reviews',
+            admin: '/api/admin',
+            adminProducts: '/api/v1/admin/products',
+            // 🆕 New routes
+            coupons: '/api/coupons',
+            notifications: '/api/notifications',
+            wishlist: '/api/wishlist',
+            search: '/api/search'
+        }
+    });
+});
+
+// ======================================================
+// API Info Endpoint
+// ======================================================
+router.get('/', (req, res) => {
+    res.status(200).json({
+        success: true,
+        message: 'خوش آمدید به API فروشگاه ویلف‌ویتا',
+        version: '1.1.0',
+        documentation: '/api/docs',
+        health: '/api/health',
+        endpoints: {
+            authentication: {
+                register: 'POST /api/auth/register',
+                login: 'POST /api/auth/login',
+                logout: 'POST /api/auth/logout',
+                refreshToken: 'POST /api/auth/refresh-token',
+                forgotPassword: 'POST /api/auth/forgot-password',
+                resetPassword: 'POST /api/auth/reset-password',
+                verifyEmail: 'GET /api/auth/verify-email/:token'
+            },
+            users: {
+                profile: 'GET /api/users/profile',
+                updateProfile: 'PUT /api/users/profile',
+                changePassword: 'PUT /api/users/change-password',
+                addresses: 'GET /api/users/addresses',
+                orders: 'GET /api/users/orders',
+                deleteAccount: 'DELETE /api/users/account'
+            },
+            products: {
+                list: 'GET /api/products',
+                single: 'GET /api/products/:id',
+                bySlug: 'GET /api/products/slug/:slug',
+                featured: 'GET /api/products/featured',
+                create: 'POST /api/products (Admin)',
+                update: 'PUT /api/products/:id (Admin)',
+                delete: 'DELETE /api/products/:id (Admin)'
+            },
+            categories: {
+                list: 'GET /api/categories',
+                tree: 'GET /api/categories/tree',
+                single: 'GET /api/categories/:id',
+                bySlug: 'GET /api/categories/slug/:slug',
+                featured: 'GET /api/categories/featured'
+            },
+            cart: {
+                get: 'GET /api/cart',
+                add: 'POST /api/cart/add',
+                update: 'PUT /api/cart/update',
+                remove: 'DELETE /api/cart/remove/:productId',
+                clear: 'DELETE /api/cart/clear'
+            },
+            orders: {
+                list: 'GET /api/orders',
+                single: 'GET /api/orders/:id',
+                create: 'POST /api/orders',
+                cancel: 'PUT /api/orders/:id/cancel',
+                track: 'GET /api/orders/:id/track'
+            },
+            payments: {
+                create: 'POST /api/payments/create',
+                verify: 'GET /api/payments/verify',
+                myPayments: 'GET /api/payments/my-payments'
+            },
+            reviews: {
+                create: 'POST /api/reviews',
+                update: 'PUT /api/reviews/:id',
+                delete: 'DELETE /api/reviews/:id',
+                myReviews: 'GET /api/reviews/my-reviews'
+            },
+            // 🆕 New Endpoints
+            coupons: {
+                available: 'GET /api/coupons/available',
+                validate: 'POST /api/coupons/validate',
+                apply: 'POST /api/coupons/apply',
+                remove: 'DELETE /api/coupons/remove',
+                list: 'GET /api/coupons (Admin)',
+                create: 'POST /api/coupons (Admin)',
+                update: 'PUT /api/coupons/:id (Admin)',
+                delete: 'DELETE /api/coupons/:id (Admin)',
+                toggle: 'PATCH /api/coupons/:id/toggle (Admin)',
+                stats: 'GET /api/coupons/:id/stats (Admin)'
+            },
+            notifications: {
+                list: 'GET /api/notifications',
+                unreadCount: 'GET /api/notifications/unread-count',
+                single: 'GET /api/notifications/:id',
+                markAsRead: 'PATCH /api/notifications/:id/read',
+                markAllAsRead: 'PATCH /api/notifications/read-all',
+                delete: 'DELETE /api/notifications/:id',
+                deleteAll: 'DELETE /api/notifications/all',
+                deleteRead: 'DELETE /api/notifications/read',
+                create: 'POST /api/notifications (Admin)',
+                stats: 'GET /api/notifications/admin/stats (Admin)'
+            },
+            wishlist: {
+                get: 'GET /api/wishlist',
+                add: 'POST /api/wishlist',
+                remove: 'DELETE /api/wishlist/:productId',
+                toggle: 'POST /api/wishlist/toggle/:productId',
+                check: 'GET /api/wishlist/check/:productId',
+                updateNote: 'PATCH /api/wishlist/:productId/note',
+                updatePriority: 'PATCH /api/wishlist/:productId/priority',
+                clear: 'DELETE /api/wishlist/clear',
+                moveToCart: 'POST /api/wishlist/:productId/move-to-cart'
+            },
+            search: {
+                products: 'GET /api/search',
+                filters: 'GET /api/search/filters',
+                suggestions: 'GET /api/search/suggestions'
+            },
+            admin: {
+                dashboard: 'GET /api/admin/dashboard',
+                users: 'GET /api/admin/users',
+                orders: 'GET /api/admin/orders',
+                stats: 'GET /api/admin/orders/stats',
+                reviews: 'GET /api/admin/reviews'
+            }
+        },
+        features: {
+            authentication: '✅ JWT Authentication & Authorization',
+            products: '✅ Product Management with Images',
+            categories: '✅ Hierarchical Categories (Tree Structure)',
+            cart: '✅ Shopping Cart with Session',
+            orders: '✅ Order Management & Tracking',
+            payments: '✅ Online Payment Gateway (ZarinPal)',
+            reviews: '✅ Product Reviews & Ratings',
+            coupons: '✅ Discount Coupons & Promotions',
+            notifications: '✅ Real-time Notifications',
+            wishlist: '✅ User Wishlist',
+            search: '✅ Advanced Search & Filters',
+            security: '✅ Rate Limiting, Helmet, Sanitization',
+            cache: '✅ Redis Caching',
+            logging: '✅ Morgan & Custom Logger'
+        },
+        support: {
+            email: 'support@wilfvita.com',
+            documentation: 'https://docs.wilfvita.com',
+            github: 'https://github.com/yourusername/wilfvita-backend'
+        }
+    });
+});
+
+// ======================================================
+// 🆕 API Statistics Endpoint
+// ======================================================
+router.get('/stats', (req, res) => {
+    const routes = router.stack
+        .filter(r => r.route)
+        .map(r => ({
+            path: r.route.path,
+            methods: Object.keys(r.route.methods)
+        }));
+
+    res.status(200).json({
+        success: true,
+        totalRoutes: routes.length,
+        totalEndpoints: router.stack.length,
+        availableRoutes: routes
+    });
+});
+
+// ======================================================
+// 404 Handler for undefined API routes
+// ======================================================
+router.use('*', (req, res) => {
+    res.status(404).json({
+        success: false,
+        message: 'مسیر درخواستی یافت نشد',
+        path: req.originalUrl,
+        method: req.method,
+        suggestion: 'لطفاً مستندات API را بررسی کنید',
+        documentation: '/api',
+        timestamp: new Date().toISOString()
+    });
+});
+
+module.exports = router;
