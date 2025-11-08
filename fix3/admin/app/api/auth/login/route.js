@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 
+// آدرس بک‌اند شما
 const API_BASE_URL = process.env.NEXT_PUBLIC_BACKEND_URL ?? "http://localhost:5000";
 
 export async function POST(request) {
@@ -13,6 +14,7 @@ export async function POST(request) {
       );
     }
 
+    // ۱. تماس با بک‌اند واقعی
     const backendResponse = await fetch(`${API_BASE_URL}/api/auth/admin/login`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -34,28 +36,37 @@ export async function POST(request) {
       );
     }
 
-    // Backend sends 'accessToken' not 'token'
+    // ۲. دریافت توکن و کاربر از پاسخ بک‌اند
+    // (بر اساس authController.js، بک‌اند 'accessToken' را برمی‌گرداند)
     const { accessToken, data } = payload || {};
     const user = data?.user;
 
     if (!accessToken) {
-      console.error("No token in response:", payload);
+      console.error("No token in response from backend:", payload);
       return NextResponse.json(
-        { message: "Login succeeded but no token was returned." },
+        { message: "Login succeeded but no token was returned from backend." },
         { status: 502 }
       );
     }
 
+    // 🎯 تغییر اصلی اینجاست:
+    // ما توکن را مستقیماً در JSON به صفحه لاگین برمی‌گردانیم.
+    // این کار باعث می‌شود layout.js که از localStorage می‌خواند، به درستی کار کند.
+    return NextResponse.json({
+      user: user,
+      token: accessToken // <-- نام آن را 'token' می‌گذاریم تا با کد صفحه لاگین هماهنگ باشد
+    });
+
+    /*
+    // --- کد قبلی (و اشتباه) که کوکی httpOnly ست می‌کرد حذف شد ---
     const response = NextResponse.json({ user });
     response.cookies.set("admin-token", accessToken, {
       httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "strict",
-      path: "/",
-      maxAge: 60 * 60 * 24 * 7
+      ...
     });
-
     return response;
+    */
+    
   } catch (error) {
     console.error("Login proxy error:", error);
     return NextResponse.json(
