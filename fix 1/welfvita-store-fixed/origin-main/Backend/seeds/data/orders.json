@@ -1,0 +1,87 @@
+[
+  {
+    "user": "60d5ecb5d6e8b7001f8e8b1a",
+    "orderItems": [
+      {
+        "name": "قفل دیجیتال هوشمند Welfvita Pro X1",
+        "qty": 1,
+        "image": "/uploads/products/lock1.jpg",
+        "price": 5500000,
+        "product": "60d5f0b5d6e8b7001f8e8b1c"
+      },
+      {
+        "name": "دوربین مداربسته 4MP تحت شبکه",
+        "qty": 2,
+        "image": "/uploads/products/camera1.jpg",
+        "price": 3200000,
+        "product": "60d5f1b5d6e8b7001f8e8b1d"
+      }
+    ],
+    "shippingAddress": {
+      "fullName": "علی محمدی",
+      "address": "خیابان آزادی، پلاک 123",
+      "city": "تهران",
+      "state": "تهران",
+      "postalCode": "1234567890",
+      "country": "ایران",
+      "phone": "09121234567"
+    },
+    "paymentMethod": "online",
+    "itemsPrice": 11900000,
+    "shippingPrice": 35000,
+    "taxPrice": 0,
+    "discountAmount": 0,
+    "totalPrice": 11935000,
+    "isPaid": true,
+    "paidAt": "2025-10-25T12:00:00.000Z",
+    "status": "processing",
+    "statusHistory": [
+      {
+        "status": "pending",
+        "timestamp": "2025-10-25T11:59:00.000Z"
+      },
+       {
+        "status": "processing",
+        "timestamp": "2025-10-25T12:00:00.000Z"
+      }
+    ]
+  },
+  {
+    "user": "60d5ecc5d6e8b7001f8e8b1e",
+    "orderItems": [
+      {
+        "name": "دوربین وای‌فای 360 درجه",
+        "qty": 1,
+        "image": "/uploads/products/camera2.jpg",
+        "price": 2100000,
+        "product": "60d5f2b5d6e8b7001f8e8b1f"
+      }
+    ],
+    "shippingAddress": {
+      "fullName": "سارا احمدی",
+      "address": "خیابان ولیعصر، کوچه بنفشه، پلاک 4",
+      "city": "شیراز",
+      "postalCode": "9876543210",
+      "country": "ایران",
+      "phone": "09129876543"
+    },
+    "paymentMethod": "cod",
+    "itemsPrice": 2100000,
+    "shippingPrice": 45000,
+    "taxPrice": 0,
+    "discountAmount": 0,
+    "totalPrice": 2145000,
+    "isPaid": false,
+    "status": "confirmed",
+     "statusHistory": [
+      {
+        "status": "pending",
+        "timestamp": "2025-10-26T08:00:00.000Z"
+      },
+       {
+        "status": "confirmed",
+        "timestamp": "2025-10-26T08:05:00.000Z"
+      }
+    ]
+  }
+]
