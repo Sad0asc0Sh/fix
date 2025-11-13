@@ -48,12 +48,32 @@ export const getProducts = async () => {
 };
 
 /**
+ * Admin: fetch all products (uses /v1/admin)
+ */
+export const getAdminProducts = async (params = {}) => {
+  const { data } = await apiClient.get("/v1/admin/products", { params });
+  return data.data;
+};
+
+/**
  * افزودن محصول جدید
  * @param {FormData} formData - اطلاعات محصول شامل تصاویر
  * @returns {Promise<Object>} محصول اضافه شده
  */
 export const addProduct = async (formData) => {
   const { data } = await apiClient.post("/products", formData, {
+    headers: {
+      "Content-Type": "multipart/form-data",
+    },
+  });
+  return data;
+};
+
+/**
+ * Admin: create product with images (uses /v1/admin)
+ */
+export const addAdminProduct = async (formData) => {
+  const { data } = await apiClient.post("/v1/admin/products", formData, {
     headers: {
       "Content-Type": "multipart/form-data",
     },
@@ -92,6 +112,14 @@ export const updateProduct = async ({ id, formData }) => {
  */
 export const deleteProduct = async (id) => {
   const { data } = await apiClient.delete(`/products/${id}`);
+  return data;
+};
+
+/**
+ * Admin: delete product (uses /v1/admin)
+ */
+export const deleteAdminProduct = async (id) => {
+  const { data } = await apiClient.delete(`/v1/admin/products/${id}`);
   return data;
 };
 

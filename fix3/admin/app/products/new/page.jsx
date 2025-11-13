@@ -3,37 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { getCategories } from "@/lib/api";
-import { getToken } from "@/utils/auth";
-
-const API_BASE_URL = process.env.NEXT_PUBLIC_BACKEND_URL ?? "http://localhost:5000";
-
-const parseJsonResponse = async (response, fallbackMessage) => {
-  let payload = null;
-  try {
-    payload = await response.json();
-  } catch (_) {
-    payload = null;
-  }
-
-  if (!response.ok) {
-    throw new Error(payload?.message || fallbackMessage);
-  }
-
-  return payload;
-};
-
-const createAdminProduct = async (formData) => {
-  const token = getToken();
-  const response = await fetch(`${API_BASE_URL}/api/v1/admin/products`, {
-    method: "POST",
-    credentials: "include",
-    headers: token ? { Authorization: `Bearer ${token}` } : {},
-    body: formData,
-  });
-
-  return parseJsonResponse(response, "Failed to create product.");
-};
+import { getCategories, addAdminProduct } from "@/lib/api";
 
 export default function NewProductPage() {
   const router = useRouter();
@@ -55,14 +25,14 @@ export default function NewProductPage() {
   });
 
   const mutation = useMutation({
-    mutationFn: createAdminProduct,
+    mutationFn: addAdminProduct,
     onSuccess: () => {
-      alert('U.O-O�U^U, O"O U.U^U?U,UOO� OOOU?U� O\'O_.');
+      alert("Product created successfully.");
       router.push("/products");
     },
     onError: (error) => {
-      console.error("OrO�O O_O� OU?O�U^O_U+ U.O-O�U^U,:", error);
-      alert(`OrO�O O_O� OU?O�U^O_U+ U.O-O�U^U,: ${error.message}`);
+      console.error("Create product failed:", error);
+      alert(`Create product failed: ${error?.response?.data?.message || error.message}`);
     },
   });
 
@@ -74,7 +44,7 @@ export default function NewProductPage() {
     event.preventDefault();
 
     if (!category) {
-      alert("U,O�U?O UOUc O_O3O�U؃?OO\"U+O_UO OU+O�OrOO\" UcU+UOO_.");
+      alert("Please select a category.");
       return;
     }
 
@@ -95,12 +65,12 @@ export default function NewProductPage() {
 
   return (
     <div className="p-8">
-      <h1 className="text-2xl font-bold mb-6 text-right">OU?O�U^O_U+ U.O-O�U^U, O�O_UOO_</h1>
+      <h1 className="text-2xl font-bold mb-6">Create Product</h1>
       <form onSubmit={handleSubmit} className="space-y-6 bg-white p-6 rounded-lg shadow-md">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 text-right">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <div>
             <label htmlFor="name" className="block text-sm font-medium text-gray-700 mb-1">
-              U+OU. U.O-O�U^U,
+              Name
             </label>
             <input
               id="name"
@@ -113,7 +83,7 @@ export default function NewProductPage() {
           </div>
           <div>
             <label htmlFor="brand" className="block text-sm font-medium text-gray-700 mb-1">
-              O"O�U+O_ (OOrO�UOOO�UO)
+              Brand (optional)
             </label>
             <input
               id="brand"
@@ -125,7 +95,7 @@ export default function NewProductPage() {
           </div>
           <div>
             <label htmlFor="price" className="block text-sm font-medium text-gray-700 mb-1">
-              U,UOU.O� (O�U^U.OU+)
+              Price
             </label>
             <input
               id="price"
@@ -139,7 +109,7 @@ export default function NewProductPage() {
           </div>
           <div>
             <label htmlFor="stock" className="block text-sm font-medium text-gray-700 mb-1">
-              U.U^O�U^O_UO OU+O"OO�
+              Stock
             </label>
             <input
               id="stock"
@@ -155,7 +125,7 @@ export default function NewProductPage() {
 
         <div>
           <label htmlFor="category" className="block text-sm font-medium text-gray-700 mb-1">
-            O_O3O�U؃?OO"U+O_UO
+            Category
           </label>
           <select
             id="category"
@@ -167,10 +137,10 @@ export default function NewProductPage() {
           >
             <option value="" disabled>
               {isLoadingCategories
-                ? "O_O� O-OU, O\"OO�U_O�OO�UO..."
+                ? "Loading categories..."
                 : isErrorCategories
-                ? "OrO�O O_O� O_O�UOOU?O� O_O3O�U؃?OO\"U+O_UO�?OU�O�"
-                : "UOUc O_O3O�U؃?OO\"U+O_UO OU+O�OrOO\" UcU+UOO_"}
+                ? "Failed to load categories"
+                : "Select a category"}
             </option>
             {categories?.map((cat) => (
               <option key={cat._id} value={cat._id}>
@@ -182,7 +152,7 @@ export default function NewProductPage() {
 
         <div>
           <label htmlFor="description" className="block text-sm font-medium text-gray-700 mb-1">
-            O�U^OUOO-OO� U.O-O�U^U,
+            Description
           </label>
           <textarea
             id="description"
@@ -196,7 +166,7 @@ export default function NewProductPage() {
 
         <div>
           <label htmlFor="images" className="block text-sm font-medium text-gray-700 mb-1">
-            O�O�OU^UOO� U.O-O�U^U,
+            Product Images
           </label>
           <input
             id="images"
@@ -213,10 +183,11 @@ export default function NewProductPage() {
             disabled={mutation.isPending}
             className="px-6 py-2 bg-blue-600 text-white font-semibold rounded-md hover:bg-blue-700 disabled:bg-gray-400"
           >
-            {mutation.isPending ? "O_O� O-OU, O�OrUOO�U�..." : "O�OrUOO�U� U.O-O�U^U,"}
+            {mutation.isPending ? "Creating..." : "Create Product"}
           </button>
         </div>
       </form>
     </div>
   );
 }
+

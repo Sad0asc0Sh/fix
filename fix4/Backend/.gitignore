@@ -1,0 +1,29 @@
+# اسرار و تنظیمات محلی
+.env
+*.env
+.env.*
+!.env.example
+
+# وابستگی‌ها
+node_modules
+
+# لاگ‌ها
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# فایل‌های سیستم عامل
+.DS_Store
+Thumbs.db
+
+# فایل‌های Build (اگر وجود داشت)
+dist/
+build/
+
+# فایل‌های IDE
+.idea/
+.vscode/
+*.swp

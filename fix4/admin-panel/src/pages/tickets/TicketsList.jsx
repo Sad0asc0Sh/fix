@@ -1,0 +1,121 @@
+import { useEffect, useState } from 'react'
+import { Card, Table, Tag, Input, Select, Space, message } from 'antd'
+import { SearchOutlined } from '@ant-design/icons'
+import { Link } from 'react-router-dom'
+import api from '../../api'
+
+function TicketsList() {
+  const [data, setData] = useState([])
+  const [loading, setLoading] = useState(false)
+  const [search, setSearch] = useState('')
+  const [status, setStatus] = useState()
+  const [priority, setPriority] = useState()
+  const [pagination, setPagination] = useState({ current: 1, pageSize: 20, total: 0 })
+
+  const fetchTickets = async (page = pagination.current, pageSize = pagination.pageSize) => {
+    setLoading(true)
+    try {
+      const params = { page, limit: pageSize, sort: '-createdAt' }
+      if (search) params.search = search
+      if (status) params.status = status
+      if (priority) params.priority = priority
+      const res = await api.get('/tickets/admin/all', { params })
+      const list = res?.data?.data || []
+      const pg = res?.data?.pagination
+      setData(list)
+      if (pg) setPagination({ current: pg.currentPage || page, pageSize, total: pg.totalItems || list.length })
+    } catch (err) {
+      message.error(err?.message || 'خطا در دریافت تیکت‌ها')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => { fetchTickets(1, pagination.pageSize) }, [status, priority])
+
+  const columns = [
+    {
+      title: 'موضوع',
+      dataIndex: 'subject',
+      key: 'subject',
+      render: (v, r) => <Link to={`/tickets/${r._id}`}>{v}</Link>,
+    },
+    {
+      title: 'کاربر',
+      dataIndex: ['user', 'name'],
+      key: 'user',
+      render: (_, r) => r.user ? `${r.user.name} (${r.user.email})` : '-',
+    },
+    {
+      title: 'سفارش',
+      dataIndex: ['order', 'orderNumber'],
+      key: 'order',
+      render: (_, r) => r.order?.orderNumber || '-',
+    },
+    {
+      title: 'اولویت',
+      dataIndex: 'priority',
+      key: 'priority',
+      render: (p) => <Tag color={p==='high'?'red':p==='medium'?'orange':'green'}>{p}</Tag>,
+    },
+    {
+      title: 'وضعیت',
+      dataIndex: 'status',
+      key: 'status',
+      render: (s) => <Tag color={s==='closed'?'red':s==='pending'?'blue':'green'}>{s}</Tag>,
+    },
+    {
+      title: 'تاریخ',
+      dataIndex: 'createdAt',
+      key: 'createdAt',
+      render: (d) => d ? new Date(d).toLocaleString('fa-IR') : '-',
+    },
+  ]
+
+  const onTableChange = (pag) => {
+    setPagination((prev) => ({ ...prev, current: pag.current, pageSize: pag.pageSize }))
+    fetchTickets(pag.current, pag.pageSize)
+  }
+
+  return (
+    <div>
+      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 16 }}>
+        <h1>تیکت‌ها</h1>
+        <Space>
+          <Input
+            placeholder="جستجو (موضوع/پیام)"
+            prefix={<SearchOutlined />}
+            style={{ width: 320 }}
+            allowClear
+            onChange={(e) => setSearch(e.target.value)}
+            onPressEnter={() => fetchTickets(1, pagination.pageSize)}
+            onBlur={() => fetchTickets(1, pagination.pageSize)}
+          />
+          <Select placeholder="وضعیت" style={{ width: 150 }} allowClear onChange={setStatus}>
+            {['open','pending','closed'].map(s => (
+              <Select.Option key={s} value={s}>{s}</Select.Option>
+            ))}
+          </Select>
+          <Select placeholder="اولویت" style={{ width: 150 }} allowClear onChange={setPriority}>
+            {['low','medium','high'].map(p => (
+              <Select.Option key={p} value={p}>{p}</Select.Option>
+            ))}
+          </Select>
+        </Space>
+      </div>
+      <Card>
+        <Table
+          columns={columns}
+          dataSource={data}
+          loading={loading}
+          rowKey="_id"
+          pagination={{ current: pagination.current, pageSize: pagination.pageSize, total: pagination.total, showSizeChanger: true }}
+          onChange={onTableChange}
+        />
+      </Card>
+    </div>
+  )
+}
+
+export default TicketsList
+

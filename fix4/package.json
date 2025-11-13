@@ -1,0 +1,43 @@
+{
+  "name": "welfvita-store-monorepo",
+  "version": "1.0.0",
+  "description": "Welfvita Store - E-commerce Platform",
+  "private": true,
+  "scripts": {
+    "install:all": "npm run install:backend && npm run install:frontend && npm run install:admin",
+    "install:backend": "cd Backend && npm install",
+    "install:frontend": "cd Frontend && npm install",
+    "install:admin": "cd admin && npm install",
+    "dev": "npm run dev:backend & npm run dev:frontend & npm run dev:admin",
+    "dev:backend": "cd Backend && npm run dev",
+    "dev:frontend": "cd Frontend && npm run dev",
+    "dev:admin": "cd admin && npm run dev",
+    "start": "npm run start:backend & npm run start:frontend & npm run start:admin",
+    "start:backend": "cd Backend && npm start",
+    "start:frontend": "cd Frontend && npm run preview",
+    "start:admin": "cd admin && npm start",
+    "build": "npm run build:frontend && npm run build:admin",
+    "build:frontend": "cd Frontend && npm run build",
+    "build:admin": "cd admin && npm run build",
+    "test": "./test-connections.sh",
+    "setup": "./setup.sh",
+    "clean": "npm run clean:backend && npm run clean:frontend && npm run clean:admin",
+    "clean:backend": "cd Backend && rm -rf node_modules",
+    "clean:frontend": "cd Frontend && rm -rf node_modules",
+    "clean:admin": "cd admin && rm -rf node_modules"
+  },
+  "keywords": [
+    "ecommerce",
+    "react",
+    "nextjs",
+    "nodejs",
+    "express",
+    "mongodb",
+    "typescript"
+  ],
+  "author": "Welfvita Team",
+  "license": "MIT",
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  }
+}

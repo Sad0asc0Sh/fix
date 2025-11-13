@@ -4,137 +4,85 @@ import Link from "next/link";
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { FiEdit, FiTrash2 } from "react-icons/fi";
-import { getToken } from "@/utils/auth";
-
-const API_BASE_URL = process.env.NEXT_PUBLIC_BACKEND_URL ?? "http://localhost:5000";
-
-const parseJsonResponse = async (response, fallbackMessage) => {
-  let payload = null;
-  try {
-    payload = await response.json();
-  } catch (_) {
-    payload = null;
-  }
-
-  if (!response.ok) {
-    throw new Error(payload?.message || fallbackMessage);
-  }
-
-  return payload;
-};
-
-const fetchAdminProducts = async () => {
-  const token = getToken();
-  const response = await fetch(`${API_BASE_URL}/api/v1/admin/products`, {
-    credentials: "include",
-    cache: "no-store",
-    headers: token ? { Authorization: `Bearer ${token}` } : {},
-  });
-
-  const payload = await parseJsonResponse(response, "Failed to fetch admin products.");
-  return payload?.data ?? payload;
-};
-
-const deleteAdminProduct = async (productId) => {
-  const token = getToken();
-  const response = await fetch(`${API_BASE_URL}/api/v1/admin/products/${productId}`, {
-    method: "DELETE",
-    credentials: "include",
-    headers: token ? { Authorization: `Bearer ${token}` } : {},
-  });
-
-  return parseJsonResponse(response, "Failed to delete product.");
-};
+import { getAdminProducts, deleteAdminProduct } from "@/lib/api";
 
 export default function ProductsPage() {
   const queryClient = useQueryClient();
   const [deletingId, setDeletingId] = useState(null);
 
   const {
-    data: productsData,
+    data: products = [],
     isLoading,
     isError,
     error,
   } = useQuery({
     queryKey: ["products"],
-    queryFn: fetchAdminProducts,
+    queryFn: () => getAdminProducts(),
   });
 
-  const products = productsData ?? [];
-
   const deleteMutation = useMutation({
-    mutationFn: deleteAdminProduct,
+    mutationFn: (id) => deleteAdminProduct(id),
     onSuccess: () => {
-      alert('U.O-O�U^U, O"O U.U^U?U,UOO� O-O�U? O\'O_.');
       queryClient.invalidateQueries({ queryKey: ["products"] });
       setDeletingId(null);
+      alert("Product deleted successfully.");
     },
-    onError: (mutationError) => {
-      alert(`OrO�O O_O� O-O�U? U.O-O�U^U,: ${mutationError.message}`);
+    onError: (e) => {
       setDeletingId(null);
+      alert(`Delete failed: ${e?.response?.data?.message || e.message}`);
     },
   });
 
   const handleDelete = (product) => {
-    if (
-      window.confirm(
-        `O�UOO OO� O-O�U? U.O-O�U^U, "${product.name}" OO�U.UOU+OU+ O_OO�UOO_OY`
-      )
-    ) {
+    if (window.confirm(`Delete product "${product.name}"?`)) {
       setDeletingId(product._id);
       deleteMutation.mutate(product._id);
     }
   };
 
   if (isLoading) {
-    return (
-      <div className="p-8 text-center">
-        O_O� O-OU, O"OO�U_O�OO�UO U.O-O�U^U,OO�...
-      </div>
-    );
+    return <div className="p-8 text-center">Loading products…</div>;
   }
 
   if (isError) {
     return (
-      <div className="p-8 text-center text-red-600">
-        OrO�O O_O� O_O�UOOU?O� U.O-O�U^U,OO�: {error.message}
-      </div>
+      <div className="p-8 text-center text-red-600">Error: {error?.message}</div>
     );
   }
 
   return (
     <div className="p-8">
       <div className="flex justify-between items-center mb-6">
-        <h1 className="text-2xl font-bold text-right">U,UOO3O� U.O-O�U^U,OO�</h1>
+        <h1 className="text-2xl font-bold">Products</h1>
         <Link href="/products/new">
           <button className="px-4 py-2 bg-blue-600 text-white font-semibold rounded-md hover:bg-blue-700">
-            OU?O�U^O_U+ U.O-O�U^U, O�O_UOO_
+            Create Product
           </button>
         </Link>
       </div>
 
       {products.length > 0 ? (
         <div className="overflow-x-auto bg-white rounded-lg shadow-md">
-          <table className="min-w-full divide-y divide-gray-200 text-right">
+          <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gray-50">
               <tr>
                 <th className="px-6 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  U+OU. U.O-O�U^U,
+                  Name
                 </th>
                 <th className="px-6 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  U,UOU.O�
+                  Price
                 </th>
                 <th className="px-6 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  U.U^O�U^O_UO
+                  Stock
                 </th>
                 <th className="px-6 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  O_O3O�U؃?OO"U+O_UO
+                  Category
                 </th>
                 <th className="px-6 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  O"O�U+O_
+                  Brand
                 </th>
                 <th className="px-6 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  O1U.U,UOOO�
+                  Actions
                 </th>
               </tr>
             </thead>
@@ -145,13 +93,13 @@ export default function ProductsPage() {
                     {product.name}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    {product.price.toLocaleString()} O�U^U.OU+
+                    {Number(product.price).toLocaleString()}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                     {product.stock}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    {product.category?.name || "U+OU.O'OrO�"}
+                    {product.category?.name || "-"}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                     {product.brand || "-"}
@@ -177,11 +125,9 @@ export default function ProductsPage() {
           </table>
         </div>
       ) : (
-        <div className="p-8 text-center text-gray-600">
-          U�UOU+ U.O-O�U^U,UO UOOU?O� U+O'O_. O"O�OUO OU?O�U^O_U+ U.O-O�U^U, O�O_UOO_OO O�U^UO
-          O_UcU.U� O"OU,O UcU,UOUc UcU+UOO_.
-        </div>
+        <div className="p-8 text-center text-gray-600">No products found.</div>
       )}
     </div>
   );
 }
+
