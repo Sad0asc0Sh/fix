@@ -1,0 +1,120 @@
+const mongoose = require('mongoose')
+
+const CategorySchema = new mongoose.Schema(
+  {
+    name: {
+      type: String,
+      required: [true, 'Category name is required'],
+      trim: true,
+      maxlength: [100, 'Category name must be at most 100 characters'],
+    },
+
+    parent: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Category',
+      default: null,
+    },
+
+    description: {
+      type: String,
+      maxlength: [500, 'Description must be at most 500 characters'],
+    },
+
+    icon: {
+      type: String,
+      default: null,
+    },
+
+    image: {
+      type: String,
+      default: null,
+    },
+
+    isFeatured: {
+      type: Boolean,
+      default: false,
+    },
+
+    slug: {
+      type: String,
+      unique: true,
+      sparse: true,
+    },
+
+    order: {
+      type: Number,
+      default: 0,
+    },
+
+    isActive: {
+      type: Boolean,
+      default: true,
+    },
+  },
+  {
+    timestamps: true,
+    toJSON: { virtuals: true },
+    toObject: { virtuals: true },
+  },
+)
+
+// Virtual field: children
+CategorySchema.virtual('children', {
+  ref: 'Category',
+  localField: '_id',
+  foreignField: 'parent',
+})
+
+// Indexes for performance and uniqueness
+CategorySchema.index({ parent: 1 })
+CategorySchema.index({ isActive: 1 })
+// Ensure category name is unique per parent (allows same name under different parents)
+CategorySchema.index({ parent: 1, name: 1 }, { unique: true })
+
+// Pre-save hook: generate unique slug from name (supports non-Latin chars)
+CategorySchema.pre('save', async function (next) {
+  try {
+    if (!this.isModified('name') && this.slug) {
+      return next()
+    }
+
+    const base = (this.name || '').toString().trim().toLowerCase()
+
+    let slug = base
+      .replace(/\s+/g, '-') // spaces -> -
+      .replace(/[^\p{L}\p{N}\-]+/gu, '') // keep letters/numbers/- (Unicode)
+      .replace(/-+/g, '-') // collapse multiple -
+      .replace(/^-+/, '') // trim leading -
+      .replace(/-+$/, '') // trim trailing -
+
+    // Fallback: if nothing remains (e.g. only symbols), use _id
+    if (!slug) {
+      slug = this._id ? this._id.toString() : new mongoose.Types.ObjectId().toString()
+    }
+
+    // Ensure slug is unique by suffixing "-2", "-3", ...
+    const Model = this.constructor
+    let uniqueSlug = slug
+    let suffix = 2
+
+    // Look for other documents with the same slug
+    // (exclude current document when updating)
+    // eslint-disable-next-line no-constant-condition
+    while (
+      await Model.findOne({
+        slug: uniqueSlug,
+        _id: { $ne: this._id },
+      }).select('_id').lean()
+    ) {
+      uniqueSlug = `${slug}-${suffix}`
+      suffix += 1
+    }
+
+    this.slug = uniqueSlug
+    next()
+  } catch (err) {
+    next(err)
+  }
+})
+
+module.exports = mongoose.model('Category', CategorySchema)
