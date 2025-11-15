@@ -102,8 +102,20 @@ function ProductsList() {
       dataIndex: 'images',
       key: 'image',
       render: (images) => {
-        const url = Array.isArray(images) && images.length > 0 ? images[0]?.url : null
-        return url ? <Image src={url} width={50} height={50} style={{ borderRadius: 4 }} /> : null
+        let url = null
+
+        if (Array.isArray(images) && images.length > 0) {
+          const first = images[0]
+          url = typeof first === 'string' ? first : first?.url
+        } else if (typeof images === 'string') {
+          url = images
+        } else if (images && typeof images === 'object' && images.url) {
+          url = images.url
+        }
+
+        return url ? (
+          <Image src={url} width={50} height={50} style={{ borderRadius: 4 }} />
+        ) : null
       },
     },
     {
@@ -264,4 +276,3 @@ function ProductsList() {
 }
 
 export default ProductsList
-

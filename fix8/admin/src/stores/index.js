@@ -15,8 +15,8 @@ export const useAuthStore = create(
       // Clear session
       logout: () => set({ user: null, token: null, isAuthenticated: false }),
     }),
-    { name: 'auth-storage' }
-  )
+    { name: 'auth-storage' },
+  ),
 )
 
 // Dashboard store (widget layout for drag & drop, etc.)
@@ -38,18 +38,43 @@ export const useDashboardStore = create((set) => ({
 // Notification store (simple demo data)
 export const useNotificationStore = create((set) => ({
   notifications: [
-    { id: '1', type: 'order', title: 'New order received', message: 'Order #12345 was placed', time: '5m ago', read: false },
-    { id: '2', type: 'stock', title: 'Low stock alert', message: 'Product X stock is low', time: '1h ago', read: false },
-    { id: '3', type: 'ticket', title: 'New ticket', message: 'Ticket #789 was created', time: '2h ago', read: true },
+    {
+      id: '1',
+      type: 'order',
+      title: 'New order received',
+      message: 'Order #12345 was placed',
+      time: '5m ago',
+      read: false,
+    },
+    {
+      id: '2',
+      type: 'stock',
+      title: 'Low stock alert',
+      message: 'Product X stock is low',
+      time: '1h ago',
+      read: false,
+    },
+    {
+      id: '3',
+      type: 'ticket',
+      title: 'New ticket',
+      message: 'Ticket #789 was created',
+      time: '2h ago',
+      read: true,
+    },
   ],
 
-  markAsRead: (id) => set((state) => ({
-    notifications: state.notifications.map((n) => (n.id === id ? { ...n, read: true } : n)),
-  })),
+  markAsRead: (id) =>
+    set((state) => ({
+      notifications: state.notifications.map((n) =>
+        n.id === id ? { ...n, read: true } : n,
+      ),
+    })),
 
-  markAllAsRead: () => set((state) => ({
-    notifications: state.notifications.map((n) => ({ ...n, read: true })),
-  })),
+  markAllAsRead: () =>
+    set((state) => ({
+      notifications: state.notifications.map((n) => ({ ...n, read: true })),
+    })),
 }))
 
 // ============================================
@@ -57,14 +82,13 @@ export const useNotificationStore = create((set) => ({
 // ============================================
 export const useCategoryStore = create((set, get) => ({
   // State
-  categoriesTree: [],        // درخت کامل دسته‌بندی‌ها (با children)
-  categoriesFlat: [],        // لیست تخت برای Select ساده
+  categoriesTree: [], // category tree for AntD Tree/TreeSelect
+  categoriesFlat: [], // flattened list for selects
   loading: false,
   error: null,
 
   // Fetch categories tree from API (with children structure)
   fetchCategoriesTree: async () => {
-    // جلوگیری از fetch مجدد در صورتی که در حال بارگذاری است
     if (get().loading) return
 
     set({ loading: true, error: null })
@@ -72,20 +96,33 @@ export const useCategoryStore = create((set, get) => ({
       const api = (await import('../api')).default
       const response = await api.get('/categories/tree')
       const rawData = response?.data?.data || []
-      
-      // تبدیل به فرمت Ant Design Tree
-      const toAntTree = (nodes = []) => {
-        return nodes.map((n) => ({
+
+      const getImageUrl = (img) => {
+        if (!img) return null
+        if (typeof img === 'string') return img
+        if (typeof img === 'object' && img.url) return img.url
+        return null
+      }
+
+      // Map backend tree to Ant Design Tree nodes and preserve icon/image info
+      const toAntTree = (nodes = []) =>
+        nodes.map((n) => ({
           title: n.name,
           key: n._id,
           value: n._id,
+          parent: n.parent || null,
+          description: n.description || '',
+          isFeatured: !!n.isFeatured,
+          icon: n.icon || null,
+          image: n.image || null,
+          iconUrl: getImageUrl(n.icon),
+          imageUrl: getImageUrl(n.image),
           children: n.children ? toAntTree(n.children) : [],
         }))
-      }
 
       const treeData = toAntTree(rawData)
-      
-      // ساخت لیست تخت برای Select ساده (اگر لازم باشد)
+
+      // Flatten for simple selects
       const flatten = (nodes = [], parentName = '') => {
         let result = []
         nodes.forEach((n) => {
@@ -98,20 +135,27 @@ export const useCategoryStore = create((set, get) => ({
         return result
       }
 
-      set({ 
-        categoriesTree: treeData, 
+      set({
+        categoriesTree: treeData,
         categoriesFlat: flatten(treeData),
-        loading: false 
+        loading: false,
       })
-      
-      console.log('✅ Categories tree loaded successfully:', treeData.length, 'root nodes')
+      // eslint-disable-next-line no-console
+      console.log(
+        'Categories tree loaded successfully:',
+        treeData.length,
+        'root nodes',
+      )
     } catch (error) {
-      console.error('❌ Failed to fetch categories:', error)
-      set({ 
-        error: error?.message || 'خطا در دریافت دسته‌بندی‌ها',
+      // eslint-disable-next-line no-console
+      console.error('Failed to fetch categories:', error)
+      set({
+        error:
+          error?.message ||
+          'خطا در دریافت لیست دسته‌بندی‌ها از سرور',
         loading: false,
         categoriesTree: [],
-        categoriesFlat: []
+        categoriesFlat: [],
       })
     }
   },

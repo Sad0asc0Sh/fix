@@ -1,5 +1,16 @@
 import { useEffect, useState } from 'react'
-import { Card, Form, Input, InputNumber, TreeSelect, Button, Upload, Tabs, message, Spin } from 'antd'
+import {
+  Card,
+  Form,
+  Input,
+  InputNumber,
+  TreeSelect,
+  Button,
+  Upload,
+  Tabs,
+  message,
+  Spin,
+} from 'antd'
 import { InboxOutlined } from '@ant-design/icons'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useCategoryStore } from '../../stores'
@@ -13,14 +24,32 @@ function ProductForm() {
   const [loading, setLoading] = useState(false)
   const [files, setFiles] = useState([])
 
-  // ============================================
-  // استفاده از Zustand Store برای دسته‌بندی‌ها
-  // ============================================
-  const { categoriesTree, loading: categoriesLoading } = useCategoryStore((state) => ({
-    categoriesTree: state.categoriesTree,
-    loading: state.loading,
-  }))
+  // Category store (Zustand)
+  const { categoriesTree, loading: categoriesLoading } = useCategoryStore(
+    (state) => ({
+      categoriesTree: state.categoriesTree,
+      loading: state.loading,
+    }),
+  )
 
+  // Helper: map product.images from API to AntD Upload fileList
+  const toFileList = (images) => {
+    if (!Array.isArray(images)) return []
+    return images
+      .map((img, index) => {
+        const url = typeof img === 'string' ? img : img?.url
+        if (!url) return null
+        return {
+          uid: String(index),
+          name: `image-${index + 1}`,
+          status: 'done',
+          url,
+        }
+      })
+      .filter(Boolean)
+  }
+
+  // Load product for edit mode
   useEffect(() => {
     if (!isEdit) return
     ;(async () => {
@@ -28,16 +57,21 @@ function ProductForm() {
       try {
         const res = await api.get(`/products/${id}`)
         const p = res?.data?.data
-        if (p) form.setFieldsValue({
-          name: p.name,
-          sku: p.sku,
-          price: p.price,
-          stock: p.stock,
-          category: p.category,
-          description: p.description,
-        })
+        if (p) {
+          form.setFieldsValue({
+            name: p.name,
+            sku: p.sku,
+            price: p.price,
+            stock: p.stock,
+            category: p.category,
+            description: p.description,
+          })
+          setFiles(toFileList(p.images))
+        }
       } catch (err) {
-        message.error(err?.message || 'خطا در دریافت محصول')
+        message.error(
+          err?.message || 'خطا در دریافت اطلاعات محصول از سرور',
+        )
       } finally {
         setLoading(false)
       }
@@ -48,26 +82,53 @@ function ProductForm() {
     setLoading(true)
     try {
       if (!isEdit) {
-        const fd = new FormData()
-        Object.entries(values).forEach(([k, v]) => {
-          if (v !== undefined && v !== null) fd.append(k, v)
-        })
-        files.forEach((f) => fd.append('images', f.originFileObj))
-        const res = await api.post('/v1/admin/products', fd, { headers: { 'Content-Type': 'multipart/form-data' } })
+        // 1) ایجاد محصول با بدنه JSON
+        const res = await api.post('/v1/admin/products', values)
         message.success('محصول با موفقیت ایجاد شد')
         const newId = res?.data?.data?._id
+
+        // 2) در صورت انتخاب تصویر، آپلود آن از طریق Cloudinary
+        if (newId && files.length > 0) {
+          const fd = new FormData()
+          files.forEach((f) => {
+            if (f.originFileObj) {
+              fd.append('images', f.originFileObj)
+            }
+          })
+          if ([...fd.keys()].length > 0) {
+            await api.post(`/products/${newId}/images`, fd, {
+              headers: { 'Content-Type': 'multipart/form-data' },
+            })
+          }
+        }
+
         navigate(newId ? `/products/edit/${newId}` : '/products')
       } else {
-        await api.put(`/products/${id}`, values)
+        // ویرایش اطلاعات متنی
+        await api.put(`/products/${id}`, {
+          ...values,
+          removeAllImages: files.length === 0,
+        })
+
+        // در صورت انتخاب عکس‌های جدید، آن‌ها را آپلود کن
         if (files.length > 0) {
           const fd = new FormData()
-          files.forEach((f) => fd.append('images', f.originFileObj))
-          await api.post(`/products/${id}/images`, fd, { headers: { 'Content-Type': 'multipart/form-data' } })
+          files.forEach((f) => {
+            if (f.originFileObj) {
+              fd.append('images', f.originFileObj)
+            }
+          })
+          if ([...fd.keys()].length > 0) {
+            await api.post(`/products/${id}/images`, fd, {
+              headers: { 'Content-Type': 'multipart/form-data' },
+            })
+          }
         }
-        message.success('محصول به‌روزرسانی شد')
+
+        message.success('محصول با موفقیت به‌روزرسانی شد')
       }
     } catch (err) {
-      message.error(err?.message || 'خطا در ذخیره محصول')
+      message.error(err?.message || 'خطا در ذخیره‌سازی اطلاعات محصول')
     } finally {
       setLoading(false)
     }
@@ -86,55 +147,116 @@ function ProductForm() {
                 label: 'اطلاعات پایه',
                 children: (
                   <>
-                    <Form.Item name="name" label="نام محصول" rules={[{ required: true, message: 'نام محصول را وارد کنید' }]}>
-                      <Input placeholder="مثال: گوشی سامسونگ Galaxy S23" />
+                    <Form.Item
+                      name="name"
+                      label="نام محصول"
+                      rules={[
+                        {
+                          required: true,
+                          message: 'وارد کردن نام محصول الزامی است',
+                        },
+                      ]}
+                    >
+                      <Input placeholder="مثلاً: دوربین مداربسته 4 مگاپیکسل" />
                     </Form.Item>
-                    
-                    <Form.Item name="sku" label="کد محصول (SKU)" rules={[{ required: true, message: 'کد محصول را وارد کنید' }]}>
-                      <Input placeholder="مثال: PROD-001" />
+
+                    <Form.Item
+                      name="sku"
+                      label="کد محصول (SKU)"
+                      rules={[
+                        {
+                          required: true,
+                          message: 'وارد کردن SKU الزامی است',
+                        },
+                      ]}
+                    >
+                      <Input placeholder="مثلاً: PROD-001" />
                     </Form.Item>
-                    
-                    <Form.Item 
-                      name="category" 
-                      label="دسته‌بندی" 
-                      rules={[{ required: true, message: 'لطفاً دسته‌بندی را انتخاب کنید' }]}
-                      help={categoriesTree.length === 0 ? "هیچ دسته‌بندی موجود نیست. لطفاً ابتدا از منوی دسته‌بندی‌ها، یک دسته ایجاد کنید." : null}
+
+                    <Form.Item
+                      name="category"
+                      label="دسته‌بندی محصول"
+                      rules={[
+                        {
+                          required: true,
+                          message: 'انتخاب دسته‌بندی محصول الزامی است',
+                        },
+                      ]}
+                      help={
+                        categoriesTree.length === 0
+                          ? 'هنوز هیچ دسته‌بندی‌ای بارگذاری نشده است. ابتدا دسته‌بندی‌ها را بسازید.'
+                          : null
+                      }
                     >
                       {categoriesLoading && categoriesTree.length === 0 ? (
                         <div style={{ padding: 20, textAlign: 'center' }}>
-                          <Spin tip="در حال بارگذاری دسته‌بندی‌ها..." />
+                          <Spin tip="در حال دریافت دسته‌بندی‌ها..." />
                         </div>
                       ) : (
                         <TreeSelect
                           treeData={categoriesTree}
-                          placeholder="یک دسته‌بندی انتخاب کنید..."
+                          placeholder="انتخاب دسته‌بندی..."
                           allowClear
                           showSearch
                           treeDefaultExpandAll
-                          filterTreeNode={(input, node) => 
-                            node.title.toLowerCase().includes(input.toLowerCase())
+                          filterTreeNode={(input, node) =>
+                            node.title
+                              .toLowerCase()
+                              .includes(input.toLowerCase())
                           }
                           disabled={categoriesTree.length === 0}
                         />
                       )}
                     </Form.Item>
-                    
-                    <Form.Item name="price" label="قیمت (تومان)" rules={[{ required: true, message: 'قیمت را وارد کنید' }]}>
-                      <InputNumber 
-                        style={{ width: '100%' }} 
-                        min={0} 
+
+                    <Form.Item
+                      name="price"
+                      label="قیمت (تومان)"
+                      rules={[
+                        {
+                          required: true,
+                          message: 'وارد کردن قیمت الزامی است',
+                        },
+                      ]}
+                    >
+                      <InputNumber
+                        style={{ width: '100%' }}
+                        min={0}
                         step={10000}
-                        formatter={value => `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
-                        parser={value => value.replace(/\$\s?|(,*)/g, '')}
+                        formatter={(value) =>
+                          `${value}`.replace(
+                            /\B(?=(\d{3})+(?!\d))/g,
+                            ',',
+                          )
+                        }
+                        parser={(value) =>
+                          value.replace(/\$\s?|(,*)/g, '')
+                        }
                       />
                     </Form.Item>
-                    
-                    <Form.Item name="stock" label="موجودی" rules={[{ required: true, message: 'موجودی را وارد کنید' }]}>
-                      <InputNumber style={{ width: '100%' }} min={0} step={1} />
+
+                    <Form.Item
+                      name="stock"
+                      label="موجودی"
+                      rules={[
+                        {
+                          required: true,
+                          message: 'وارد کردن موجودی الزامی است',
+                        },
+                      ]}
+                    >
+                      <InputNumber
+                        style={{ width: '100%' }}
+                        min={0}
+                        step={1}
+                      />
                     </Form.Item>
-                    
+
                     <Form.Item name="description" label="توضیحات">
-                      <Input.TextArea rows={5} placeholder="توضیحات کامل محصول را وارد کنید..." />
+                      <Input.TextArea
+                        rows={5}
+                        placeholder="توضیحات کامل محصول را وارد کنید..."
+                      />
                     </Form.Item>
                   </>
                 ),
@@ -155,10 +277,11 @@ function ProductForm() {
                         <InboxOutlined />
                       </p>
                       <p className="ant-upload-text">
-                        تصاویر را اینجا بکشید و رها کنید یا کلیک کنید
+                        تصاویر را بکشید و رها کنید یا برای انتخاب کلیک کنید.
                       </p>
                       <p className="ant-upload-hint">
-                        می‌توانید چندین تصویر را همزمان انتخاب کنید
+                        تصاویر انتخاب‌شده بعد از ذخیره‌سازی، روی Cloudinary آپلود
+                        شده و در لیست محصولات نمایش داده می‌شوند.
                       </p>
                     </Upload.Dragger>
                   </>
@@ -168,11 +291,16 @@ function ProductForm() {
           />
 
           <Form.Item style={{ marginTop: 24 }}>
-            <Button type="primary" htmlType="submit" loading={loading} size="large">
+            <Button
+              type="primary"
+              htmlType="submit"
+              loading={loading}
+              size="large"
+            >
               {isEdit ? 'ذخیره تغییرات' : 'ایجاد محصول'}
             </Button>
-            <Button 
-              style={{ marginRight: 8 }} 
+            <Button
+              style={{ marginRight: 8 }}
               onClick={() => navigate('/products')}
               disabled={loading}
             >
@@ -186,4 +314,3 @@ function ProductForm() {
 }
 
 export default ProductForm
-

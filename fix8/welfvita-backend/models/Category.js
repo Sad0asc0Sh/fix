@@ -20,13 +20,15 @@ const CategorySchema = new mongoose.Schema(
       maxlength: [500, 'Description must be at most 500 characters'],
     },
 
+    // Icon and image can be either simple string path or
+    // an object { url, public_id } for integrations like Cloudinary.
     icon: {
-      type: String,
+      type: mongoose.Schema.Types.Mixed,
       default: null,
     },
 
     image: {
-      type: String,
+      type: mongoose.Schema.Types.Mixed,
       default: null,
     },
 

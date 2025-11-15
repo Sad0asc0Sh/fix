@@ -49,9 +49,10 @@ const ProductSchema = new mongoose.Schema(
       trim: true,
     },
 
-    // For frontend, array of string paths is enough
+    // Images: array of objects {url, public_id} (Cloudinary)
+    // but old string paths are also accepted for backward compatibility.
     images: {
-      type: [String],
+      type: [mongoose.Schema.Types.Mixed],
       default: [],
     },
 
@@ -125,4 +126,3 @@ ProductSchema.index({ isFeatured: 1 })
 ProductSchema.index({ isActive: 1 })
 
 module.exports = mongoose.model('Product', ProductSchema)
-

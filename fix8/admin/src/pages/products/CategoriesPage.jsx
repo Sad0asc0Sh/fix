@@ -1,57 +1,65 @@
-import { useState } from 'react'
-import { 
-  Card, 
-  Tree, 
-  TreeSelect, 
-  Button, 
-  Modal, 
-  Form, 
-  Input, 
-  Upload, 
+import { useEffect, useState } from 'react'
+import {
+  Card,
+  Tree,
+  TreeSelect,
+  Button,
+  Modal,
+  Form,
+  Input,
+  Upload,
   Checkbox,
-  message, 
-  Space, 
+  message,
+  Space,
   Spin,
-  Popconfirm 
+  Popconfirm,
 } from 'antd'
-import { 
-  PlusOutlined, 
-  EditOutlined, 
-  DeleteOutlined, 
-  InboxOutlined 
+import {
+  PlusOutlined,
+  EditOutlined,
+  DeleteOutlined,
+  InboxOutlined,
 } from '@ant-design/icons'
 import { useCategoryStore } from '../../stores'
 import api from '../../api'
 
 function CategoriesPage() {
-  // ============================================
   // Zustand Store - Single Source of Truth
-  // ============================================
-  const { categoriesTree, loading, fetchCategoriesTree } = useCategoryStore((state) => ({
-    categoriesTree: state.categoriesTree,
-    loading: state.loading,
-    fetchCategoriesTree: state.fetchCategoriesTree,
-  }))
+  const { categoriesTree, loading, fetchCategoriesTree } = useCategoryStore(
+    (state) => ({
+      categoriesTree: state.categoriesTree,
+      loading: state.loading,
+      fetchCategoriesTree: state.fetchCategoriesTree,
+    }),
+  )
 
-  // ============================================
   // Local State
-  // ============================================
   const [modalVisible, setModalVisible] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [editingCategory, setEditingCategory] = useState(null)
   const [form] = Form.useForm()
 
-  // ============================================
-  // Form Submit Handler (تست ۲ و ۳)
-  // ============================================
+  // Initial load
+  useEffect(() => {
+    if (!categoriesTree || categoriesTree.length === 0) {
+      fetchCategoriesTree()
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  // Normalize Upload event to fileList
+  const normFileList = (e) => {
+    if (Array.isArray(e)) return e
+    return e?.fileList || []
+  }
+
+  // Submit handler (create / update)
   const onFinish = async (values) => {
     try {
       setSubmitting(true)
 
-      // ساخت FormData برای ارسال فایل‌ها
       const formData = new FormData()
-      
-      // فیلدهای متنی
+
       formData.append('name', values.name)
       if (values.parent) {
         formData.append('parent', values.parent)
@@ -63,87 +71,111 @@ function CategoriesPage() {
         formData.append('isFeatured', values.isFeatured)
       }
 
-      // فایل آیکون (اگر آپلود شده باشد)
-      if (values.icon && values.icon.fileList && values.icon.fileList[0]?.originFileObj) {
-        formData.append('icon', values.icon.fileList[0].originFileObj)
+      const hadIconBefore = Boolean(editingCategory?.iconUrl)
+      const hadImageBefore = Boolean(editingCategory?.imageUrl)
+
+      const pickNewFile = (files) => {
+        if (!Array.isArray(files)) return null
+        return files.find((f) => f.originFileObj) || null
       }
 
-      // فایل تصویر (اگر آپلود شده باشد)
-      if (values.image && values.image.fileList && values.image.fileList[0]?.originFileObj) {
-        formData.append('image', values.image.fileList[0].originFileObj)
+      const iconFile = pickNewFile(values.icon)
+      if (iconFile) {
+        formData.append('icon', iconFile.originFileObj)
+      } else if (hadIconBefore && (!values.icon || values.icon.length === 0)) {
+        // Explicitly request icon removal when user cleared existing icon
+        formData.append('removeIcon', 'true')
       }
 
-      // ارسال به API
-      if (editingCategory) {
+      const imageFile = pickNewFile(values.image)
+      if (imageFile) {
+        formData.append('image', imageFile.originFileObj)
+      } else if (hadImageBefore && (!values.image || values.image.length === 0)) {
+        // Explicitly request image removal when user cleared existing image
+        formData.append('removeImage', 'true')
+      }
+
+      if (editingCategory && editingCategory._id) {
         await api.put(`/categories/${editingCategory._id}`, formData, {
-          headers: { 'Content-Type': 'multipart/form-data' }
+          headers: { 'Content-Type': 'multipart/form-data' },
         })
         message.success('دسته‌بندی با موفقیت ویرایش شد')
       } else {
         await api.post('/categories', formData, {
-          headers: { 'Content-Type': 'multipart/form-data' }
+          headers: { 'Content-Type': 'multipart/form-data' },
         })
         message.success('دسته‌بندی با موفقیت ایجاد شد')
       }
 
-      // *** اجباری: رفرش انبار سراسری ***
       await fetchCategoriesTree()
-
-      // بستن Modal و ریست فرم
       setModalVisible(false)
       setEditingCategory(null)
       form.resetFields()
-
     } catch (error) {
-      if (error?.errorFields) return // خطای Validation
-      message.error(error?.message || 'خطا در ذخیره دسته‌بندی')
+      if (error?.errorFields) return
+      message.error(
+        error?.message || 'خطا در ذخیره‌سازی اطلاعات دسته‌بندی',
+      )
     } finally {
       setSubmitting(false)
     }
   }
 
-  // ============================================
   // Open Modal for Create
-  // ============================================
   const handleCreate = () => {
     setEditingCategory(null)
     form.resetFields()
     setModalVisible(true)
   }
 
-  // ============================================
   // Open Modal for Edit
-  // ============================================
   const handleEdit = (category) => {
-    setEditingCategory(category)
+    const node = {
+      ...category,
+      _id: category._id || category.key,
+    }
+    setEditingCategory(node)
     form.setFieldsValue({
-      name: category.title,
-      parent: category.parent,
-      description: category.description,
-      isFeatured: category.isFeatured || false,
-      // فایل‌ها را نمی‌توان در فرم پیش‌پر کرد
+      name: node.title,
+      parent: node.parent || null,
+      description: node.description || '',
+      isFeatured: node.isFeatured || false,
+      icon: node.iconUrl
+        ? [
+            {
+              uid: '-1',
+              name: 'icon',
+              status: 'done',
+              url: node.iconUrl,
+            },
+          ]
+        : [],
+      image: node.imageUrl
+        ? [
+            {
+              uid: '-1',
+              name: 'image',
+              status: 'done',
+              url: node.imageUrl,
+            },
+          ]
+        : [],
     })
     setModalVisible(true)
   }
 
-  // ============================================
   // Delete Category
-  // ============================================
   const handleDelete = async (categoryId) => {
     try {
       await api.delete(`/categories/${categoryId}`)
-      message.success('دسته‌بندی حذف شد')
-      
-      // *** اجباری: رفرش انبار سراسری ***
+      message.success('دسته‌بندی با موفقیت حذف شد')
       await fetchCategoriesTree()
     } catch (error) {
       message.error(error?.message || 'خطا در حذف دسته‌بندی')
     }
   }
 
-  // ============================================
-  // Drag & Drop Handler (تست ۴)
-  // ============================================
+  // Drag & Drop Handler (change parent)
   const onDrop = async (info) => {
     const dragNodeId = info.dragNode.key
     const dropNodeId = info.node.key
@@ -151,39 +183,50 @@ function CategoriesPage() {
 
     try {
       let newParentId = null
-      
+
       if (!dropToGap) {
-        // جابجایی به داخل نود (به عنوان child)
+        // dropped on node -> make it parent
         newParentId = dropNodeId
-      } else {
-        // جابجایی در کنار نود (هم‌سطح)
-        // در این حالت، والد نود مقصد را می‌گیریم
-        // برای سادگی، می‌توانیم از parent فعلی نود مقصد استفاده کنیم
-        // یا null (برای ریشه)
-        newParentId = info.node.parent || null
+      } else if (info.node.parent) {
+        // dropped between nodes -> keep same parent as target node
+        newParentId = info.node.parent
       }
 
-      // ارسال به API
       await api.put(`/categories/${dragNodeId}`, { parent: newParentId })
-      message.success('دسته‌بندی جابجا شد')
-
-      // *** اجباری: رفرش انبار سراسری ***
+      message.success('ساختار دسته‌بندی با موفقیت به‌روزرسانی شد')
       await fetchCategoriesTree()
-
     } catch (error) {
       message.error(error?.message || 'خطا در جابجایی دسته‌بندی')
     }
   }
 
-  // ============================================
-  // Render Tree with Actions
-  // ============================================
-  const renderTreeNodes = (data) => {
-    return data.map((item) => ({
+  // Render Tree with Actions and icon preview
+  const renderTreeNodes = (data) =>
+    data.map((item) => ({
       ...item,
       title: (
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <span>{item.title}</span>
+        <div
+          style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+          }}
+        >
+          <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            {item.iconUrl && (
+              <img
+                src={item.iconUrl}
+                alt="icon"
+                style={{
+                  width: 20,
+                  height: 20,
+                  objectFit: 'cover',
+                  borderRadius: 4,
+                }}
+              />
+            )}
+            <span>{item.title}</span>
+          </span>
           <Space size="small">
             <Button
               type="text"
@@ -191,17 +234,17 @@ function CategoriesPage() {
               icon={<EditOutlined />}
               onClick={(e) => {
                 e.stopPropagation()
-                handleEdit({ _id: item.key, title: item.title })
+                handleEdit(item)
               }}
             />
             <Popconfirm
-              title="آیا از حذف این دسته‌بندی مطمئن هستید؟"
+              title="حذف این دسته‌بندی؟"
               onConfirm={(e) => {
                 e.stopPropagation()
                 handleDelete(item.key)
               }}
-              okText="بله"
-              cancelText="خیر"
+              okText="حذف"
+              cancelText="انصراف"
             >
               <Button
                 type="text"
@@ -216,11 +259,17 @@ function CategoriesPage() {
       ),
       children: item.children ? renderTreeNodes(item.children) : undefined,
     }))
-  }
 
   return (
     <div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+      <div
+        style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          marginBottom: 16,
+        }}
+      >
         <h1>مدیریت دسته‌بندی‌ها</h1>
         <Button type="primary" icon={<PlusOutlined />} onClick={handleCreate}>
           افزودن دسته‌بندی جدید
@@ -230,18 +279,28 @@ function CategoriesPage() {
       <Card>
         {loading && categoriesTree.length === 0 ? (
           <div style={{ textAlign: 'center', padding: '40px 0' }}>
-            <Spin tip="در حال بارگذاری دسته‌بندی‌ها..." />
+            <Spin tip="در حال دریافت دسته‌بندی‌ها..." />
           </div>
         ) : categoriesTree.length === 0 ? (
-          <div style={{ textAlign: 'center', padding: '40px 0', color: '#999' }}>
-            <p>هیچ دسته‌بندی موجود نیست</p>
-            <p style={{ fontSize: 12 }}>برای شروع، یک دسته‌بندی اصلی ایجاد کنید</p>
+          <div
+            style={{
+              textAlign: 'center',
+              padding: '40px 0',
+              color: '#999',
+            }}
+          >
+            <p>هنوز هیچ دسته‌بندی‌ای ثبت نشده است.</p>
+            <p style={{ fontSize: 12 }}>
+              روی «افزودن دسته‌بندی جدید» کلیک کنید تا اولین دسته‌بندی را ایجاد
+              کنید.
+            </p>
           </div>
         ) : (
           <Space direction="vertical" style={{ width: '100%' }} size="large">
             <div>
               <h3 style={{ marginBottom: 12 }}>
-                درخت دسته‌بندی‌ها (می‌توانید با کشیدن، دسته‌ها را جابجا کنید):
+                ساختار درختی دسته‌بندی‌ها (برای جابجایی، درخت را درگ و دراپ
+                کنید):
               </h3>
               <Tree
                 treeData={renderTreeNodes(categoriesTree)}
@@ -249,7 +308,11 @@ function CategoriesPage() {
                 showLine
                 draggable
                 onDrop={onDrop}
-                style={{ background: '#fafafa', padding: 16, borderRadius: 8 }}
+                style={{
+                  background: '#fafafa',
+                  padding: 16,
+                  borderRadius: 8,
+                }}
               />
             </div>
           </Space>
@@ -265,55 +328,58 @@ function CategoriesPage() {
           form.resetFields()
         }}
         onOk={() => form.submit()}
-        title={editingCategory ? 'ویرایش دسته‌بندی' : 'ایجاد دسته‌بندی جدید'}
-        okText={editingCategory ? 'ذخیره' : 'ایجاد'}
+        title={editingCategory ? 'ویرایش دسته‌بندی' : 'دسته‌بندی جدید'}
+        okText={editingCategory ? 'ذخیره تغییرات' : 'ایجاد'}
         cancelText="انصراف"
         confirmLoading={submitting}
         width={700}
       >
         <Form form={form} layout="vertical" onFinish={onFinish}>
-          {/* 1. نام */}
+          {/* 1. Name */}
           <Form.Item
             name="name"
             label="نام دسته‌بندی"
-            rules={[{ required: true, message: 'لطفاً نام دسته‌بندی را وارد کنید' }]}
+            rules={[
+              {
+                required: true,
+                message: 'وارد کردن نام دسته‌بندی الزامی است',
+              },
+            ]}
           >
-            <Input placeholder="مثال: الکترونیک، پوشاک، کتاب، ..." />
+            <Input placeholder="مثلاً: دوربین مداربسته" />
           </Form.Item>
 
-          {/* 2. والد (TreeSelect) */}
+          {/* 2. Parent */}
           <Form.Item
             name="parent"
             label="دسته‌بندی والد (اختیاری)"
-            help="برای ایجاد یک دسته اصلی (ریشه)، این فیلد را خالی بگذارید."
+            help="در صورت خالی بودن، این دسته در سطح ریشه قرار می‌گیرد."
           >
             <TreeSelect
               treeData={categoriesTree}
               loading={loading}
-              placeholder="برای انتخاب دسته والد کلیک کنید"
-              allowClear={true}
-              showSearch={true}
-              treeDefaultExpandAll={true}
+              placeholder="انتخاب دسته‌بندی والد..."
+              allowClear
+              showSearch
+              treeDefaultExpandAll
               filterTreeNode={(input, node) =>
                 node.title.toLowerCase().includes(input.toLowerCase())
               }
             />
           </Form.Item>
 
-          {/* 3. توضیحات */}
+          {/* 3. Description */}
           <Form.Item name="description" label="توضیحات (اختیاری)">
-            <Input.TextArea
-              rows={3}
-              placeholder="توضیحات کوتاهی درباره این دسته‌بندی..."
-            />
+            <Input.TextArea rows={3} placeholder="توضیحات کوتاه درباره دسته‌بندی" />
           </Form.Item>
 
-          {/* 4. آیکون */}
+          {/* 4. Icon */}
           <Form.Item
             name="icon"
             label="آیکون دسته‌بندی (اختیاری)"
-            help="یک تصویر کوچک برای آیکون (مثلاً 64x64 پیکسل)"
-            valuePropName="file"
+            help="برای نمایش درخت و لیست‌ها، یک آیکون کوچک انتخاب کنید."
+            valuePropName="fileList"
+            getValueFromEvent={normFileList}
           >
             <Upload.Dragger
               maxCount={1}
@@ -325,17 +391,18 @@ function CategoriesPage() {
                 <InboxOutlined />
               </p>
               <p className="ant-upload-text">
-                آیکون را اینجا بکشید یا کلیک کنید
+                آیکون را بکشید و رها کنید یا برای انتخاب کلیک کنید.
               </p>
             </Upload.Dragger>
           </Form.Item>
 
-          {/* 5. تصویر */}
+          {/* 5. Image */}
           <Form.Item
             name="image"
             label="تصویر دسته‌بندی (اختیاری)"
-            help="یک تصویر بزرگتر برای نمایش در صفحه دسته‌بندی"
-            valuePropName="file"
+            help="این تصویر می‌تواند در صفحات فروشگاه نمایش داده شود."
+            valuePropName="fileList"
+            getValueFromEvent={normFileList}
           >
             <Upload.Dragger
               maxCount={1}
@@ -347,14 +414,14 @@ function CategoriesPage() {
                 <InboxOutlined />
               </p>
               <p className="ant-upload-text">
-                تصویر را اینجا بکشید یا کلیک کنید
+                تصویر را بکشید و رها کنید یا برای انتخاب کلیک کنید.
               </p>
             </Upload.Dragger>
           </Form.Item>
 
-          {/* 6. ویژه */}
+          {/* 6. Featured */}
           <Form.Item name="isFeatured" valuePropName="checked">
-            <Checkbox>این دسته‌بندی را به عنوان ویژه (Featured) نشان بده</Checkbox>
+            <Checkbox>نمایش به‌عنوان دسته‌بندی ویژه (Featured)</Checkbox>
           </Form.Item>
         </Form>
       </Modal>
@@ -363,4 +430,3 @@ function CategoriesPage() {
 }
 
 export default CategoriesPage
-

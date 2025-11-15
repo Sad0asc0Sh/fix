@@ -1,32 +1,17 @@
 const express = require('express')
 const router = express.Router()
-const path = require('path')
-const fs = require('fs')
-const multer = require('multer')
 const Product = require('../models/Product')
 const { protect, authorize } = require('../middleware/auth')
+const { upload, cloudinary } = require('../middleware/upload')
 
-// ============================================
-// Multer config for product images
-// ============================================
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    const dir = path.join('uploads', 'products')
-    if (!fs.existsSync(dir)) {
-      fs.mkdirSync(dir, { recursive: true })
-    }
-    cb(null, dir)
-  },
-  filename: (req, file, cb) => {
-    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1e9)
-    cb(null, uniqueSuffix + path.extname(file.originalname))
-  },
-})
-
-const upload = multer({
-  storage,
-  limits: { fileSize: 5 * 1024 * 1024 },
-})
+// Normalize Cloudinary file object to { url, public_id }
+const extractImageInfo = (file) => {
+  if (!file) return null
+  return {
+    url: file.path,
+    public_id: file.filename,
+  }
+}
 
 // Helper to build filter object from query
 const buildProductFilter = (query) => {
@@ -188,13 +173,10 @@ router.put(
   authorize('admin', 'manager', 'superadmin'),
   async (req, res) => {
     try {
-      const updates = req.body || {}
+      const body = req.body || {}
+      const { removeAllImages, ...updates } = body
 
-      const product = await Product.findByIdAndUpdate(
-        req.params.id,
-        updates,
-        { new: true, runValidators: true },
-      )
+      const product = await Product.findById(req.params.id)
 
       if (!product) {
         return res.status(404).json({
@@ -202,6 +184,29 @@ router.put(
           message: 'Product not found',
         })
       }
+
+      Object.assign(product, updates)
+
+      // If client requested to remove all images, delete from Cloudinary and clear array
+      if (removeAllImages === 'true' || removeAllImages === true) {
+        if (Array.isArray(product.images)) {
+          for (const img of product.images) {
+            if (img && typeof img === 'object' && img.public_id) {
+              try {
+                await cloudinary.uploader.destroy(img.public_id)
+              } catch (err) {
+                console.error(
+                  'Error deleting product image from Cloudinary during update:',
+                  err.message,
+                )
+              }
+            }
+          }
+        }
+        product.images = []
+      }
+
+      await product.save()
 
       res.json({
         success: true,
@@ -237,8 +242,9 @@ router.post(
         })
       }
 
-      const newImages =
-        (req.files || []).map((f) => path.join('uploads', 'products', path.basename(f.path)))
+      const newImages = (req.files || [])
+        .map((file) => extractImageInfo(file))
+        .filter(Boolean)
 
       product.images = [...(product.images || []), ...newImages]
       await product.save()
@@ -268,7 +274,7 @@ router.delete(
   authorize('admin', 'manager', 'superadmin'),
   async (req, res) => {
     try {
-      const product = await Product.findByIdAndDelete(req.params.id)
+      const product = await Product.findById(req.params.id)
 
       if (!product) {
         return res.status(404).json({
@@ -276,6 +282,21 @@ router.delete(
           message: 'Product not found',
         })
       }
+
+      // Delete any Cloudinary images associated with this product
+      if (Array.isArray(product.images)) {
+        for (const img of product.images) {
+          if (img && typeof img === 'object' && img.public_id) {
+            try {
+              await cloudinary.uploader.destroy(img.public_id)
+            } catch (err) {
+              console.error('Error deleting product image from Cloudinary:', err.message)
+            }
+          }
+        }
+      }
+
+      await product.deleteOne()
 
       res.json({
         success: true,
@@ -293,4 +314,3 @@ router.delete(
 )
 
 module.exports = router
-
