@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Form, Input, Button, Card, Alert } from 'antd'
 import { UserOutlined, LockOutlined } from '@ant-design/icons'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, Link } from 'react-router-dom'
 import { useAuthStore } from '../stores'
 import api from '../api'
 
@@ -81,6 +81,19 @@ function LoginPage() {
               ورود
             </Button>
           </Form.Item>
+
+          <div style={{ textAlign: 'center', marginTop: 16 }}>
+            <Link
+              to="/forgot-password"
+              style={{
+                color: '#1890ff',
+                textDecoration: 'none',
+                fontSize: 14,
+              }}
+            >
+              رمز عبور خود را فراموش کرده‌اید؟
+            </Link>
+          </div>
         </Form>
       </Card>
     </div>

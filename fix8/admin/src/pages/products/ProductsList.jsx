@@ -11,6 +11,7 @@ import {
   Modal,
   message,
   Checkbox,
+  Upload,
 } from 'antd'
 import {
   PlusOutlined,
@@ -19,9 +20,12 @@ import {
   ImportOutlined,
   DeleteOutlined,
   EditOutlined,
+  InboxOutlined,
 } from '@ant-design/icons'
 import { Link } from 'react-router-dom'
 import api from '../../api'
+
+const { Dragger } = Upload
 
 function ProductsList({ mode }) {
   const [products, setProducts] = useState([])
@@ -40,6 +44,8 @@ function ProductsList({ mode }) {
     total: 0,
   })
   const [categories, setCategories] = useState([])
+  const [importModalVisible, setImportModalVisible] = useState(false)
+  const [uploading, setUploading] = useState(false)
 
   useEffect(() => {
     ;(async () => {
@@ -287,6 +293,71 @@ function ProductsList({ mode }) {
     fetchProducts(pag.current, pag.pageSize)
   }
 
+  // Handle Excel Export
+  const handleExport = async () => {
+    try {
+      const response = await api.get('/products/export/excel', {
+        responseType: 'blob',
+      })
+
+      // Create a blob URL and trigger download
+      const url = window.URL.createObjectURL(new Blob([response.data]))
+      const link = document.createElement('a')
+      link.href = url
+      link.setAttribute('download', 'products.xlsx')
+      document.body.appendChild(link)
+      link.click()
+      link.remove()
+      window.URL.revokeObjectURL(url)
+
+      message.success('فایل Excel با موفقیت دانلود شد')
+    } catch (err) {
+      console.error('Error exporting products:', err)
+      message.error('خطا در برون‌ریزی محصولات')
+    }
+  }
+
+  // Upload props for CSV import
+  const uploadProps = {
+    name: 'file',
+    multiple: false,
+    accept: '.csv',
+    showUploadList: false,
+    customRequest: async ({ file, onSuccess, onError }) => {
+      setUploading(true)
+      const formData = new FormData()
+      formData.append('file', file)
+
+      try {
+        const token = localStorage.getItem('token')
+        const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5000/api'}/products/import/csv`, {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+          body: formData,
+        })
+
+        const data = await response.json()
+
+        if (!response.ok) {
+          throw new Error(data.message || 'خطا در آپلود فایل')
+        }
+
+        onSuccess(data)
+        message.success(data.message || 'محصولات با موفقیت درون‌ریزی شدند')
+        setImportModalVisible(false)
+        fetchProducts() // Refresh product list
+      } catch (err) {
+        console.error('Error importing products:', err)
+        onError(err)
+        message.error(err.message || 'خطا در درون‌ریزی محصولات')
+      } finally {
+        setUploading(false)
+      }
+    },
+  }
+
   return (
     <div>
       <div
@@ -299,8 +370,12 @@ function ProductsList({ mode }) {
       >
         <h1>لیست محصولات</h1>
         <Space>
-          <Button icon={<ImportOutlined />}>درون‌ریزی CSV</Button>
-          <Button icon={<ExportOutlined />}>برون‌ریزی Excel</Button>
+          <Button icon={<ImportOutlined />} onClick={() => setImportModalVisible(true)}>
+            درون‌ریزی CSV
+          </Button>
+          <Button icon={<ExportOutlined />} onClick={handleExport}>
+            برون‌ریزی Excel
+          </Button>
           <Link to="/products/new">
             <Button type="primary" icon={<PlusOutlined />}>
               محصول جدید
@@ -407,6 +482,39 @@ function ProductsList({ mode }) {
         }}
         onChange={onTableChange}
       />
+
+      {/* Import Modal */}
+      <Modal
+        title="درون‌ریزی محصولات از CSV"
+        open={importModalVisible}
+        onCancel={() => setImportModalVisible(false)}
+        footer={null}
+        width={600}
+      >
+        <div style={{ marginBottom: 16 }}>
+          <p>
+            فایل CSV خود را با فرمت زیر آماده کنید:
+          </p>
+          <code style={{ display: 'block', padding: 8, background: '#f5f5f5', marginBottom: 8 }}>
+            name,sku,productType,price,compareAtPrice,stock,category,brand,description,isActive,isFeatured
+          </code>
+          <p style={{ fontSize: '0.9em', color: '#666' }}>
+            نکته: نام دسته‌بندی و برند باید دقیقاً با نام موجود در سیستم مطابقت داشته باشد.
+          </p>
+        </div>
+
+        <Dragger {...uploadProps} disabled={uploading}>
+          <p className="ant-upload-drag-icon">
+            <InboxOutlined />
+          </p>
+          <p className="ant-upload-text">
+            فایل CSV را اینجا بکشید یا کلیک کنید
+          </p>
+          <p className="ant-upload-hint">
+            فقط فایل‌های با پسوند .csv پذیرفته می‌شوند
+          </p>
+        </Dragger>
+      </Modal>
     </div>
   )
 }

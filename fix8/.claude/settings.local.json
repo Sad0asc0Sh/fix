@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(node seedAbandonedCart.js:*)",
+      "Bash(node testEnv.js:*)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}

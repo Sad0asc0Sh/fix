@@ -107,6 +107,10 @@ app.use('/api/coupons', couponRoutes)
 const ticketRoutes = require('./routes/tickets')
 app.use('/api/tickets', ticketRoutes)
 
+// Reviews Routes
+const reviewRoutes = require('./routes/reviews')
+app.use('/api/reviews', reviewRoutes)
+
 // Blog & CMS Routes
 const blogRoutes = require('./routes/blog')
 app.use('/api/blog', blogRoutes)

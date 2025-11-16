@@ -164,9 +164,16 @@ const orderSchema = new mongoose.Schema(
   },
 )
 
-// Index برای جستجوی سریع‌تر
+// ============================================
+// Database Indexes for Performance
+// ============================================
+// Compound indexes for common filter combinations
+orderSchema.index({ user: 1, orderStatus: 1, isPaid: 1 })
+orderSchema.index({ orderStatus: 1, isPaid: 1, createdAt: -1 })
+// Single field indexes
 orderSchema.index({ user: 1 })
 orderSchema.index({ orderStatus: 1 })
+orderSchema.index({ isPaid: 1 })
 orderSchema.index({ createdAt: -1 })
 
 module.exports = mongoose.model('Order', orderSchema)

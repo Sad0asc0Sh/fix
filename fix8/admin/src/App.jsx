@@ -1,42 +1,75 @@
+import { Suspense, lazy } from 'react'
 import { Routes, Route, Navigate } from 'react-router-dom'
+import { Spin } from 'antd'
 import { useAuthStore } from './stores'
 import MainLayout from './components/layout/MainLayout'
+
+// LoginPage - not lazy (needed immediately)
 import LoginPage from './pages/LoginPage'
 
-// Core pages
-import Dashboard from './pages/Dashboard'
-import ProductsList from './pages/products/ProductsList'
-import ProductForm from './pages/products/ProductForm'
-import ProductVariants from './pages/products/ProductVariants'
-import CategoriesPage from './pages/products/CategoriesPage'
-import BrandsPage from './pages/products/BrandsPage'
-import InventoryPage from './pages/products/InventoryPage'
+// Lazy-loaded pages
+const Dashboard = lazy(() => import('./pages/Dashboard'))
 
-import OrdersList from './pages/orders/OrdersList'
-import OrderDetail from './pages/orders/OrderDetail'
-import RMAPage from './pages/orders/RMAPage'
-import AbandonedCartsPage from './pages/orders/AbandonedCartsPage'
+// Products
+const ProductsList = lazy(() => import('./pages/products/ProductsList'))
+const ProductForm = lazy(() => import('./pages/products/ProductForm'))
+const ProductVariants = lazy(() => import('./pages/products/ProductVariants'))
+const CategoriesPage = lazy(() => import('./pages/products/CategoriesPage'))
+const BrandsPage = lazy(() => import('./pages/products/BrandsPage'))
+const InventoryPage = lazy(() => import('./pages/products/InventoryPage'))
+const ReviewsPage = lazy(() => import('./pages/products/ReviewsPage'))
 
-import CustomersList from './pages/customers/CustomersList'
-import CustomerProfile from './pages/customers/CustomerProfile'
+// Orders
+const OrdersList = lazy(() => import('./pages/orders/OrdersList'))
+const OrderDetail = lazy(() => import('./pages/orders/OrderDetail'))
+const RMAPage = lazy(() => import('./pages/orders/RMAPage'))
+const AbandonedCartsPage = lazy(() => import('./pages/orders/AbandonedCartsPage'))
 
-import CouponsPage from './pages/finance/CouponsPage'
-import ShippingPage from './pages/finance/ShippingPage'
+// Customers
+const CustomersList = lazy(() => import('./pages/customers/CustomersList'))
+const CustomerProfile = lazy(() => import('./pages/customers/CustomerProfile'))
 
-import PagesManagement from './pages/content/PagesManagement'
-import BlogPosts from './pages/content/BlogPosts'
-import BannersPage from './pages/content/BannersPage'
+// Finance
+const CouponsPage = lazy(() => import('./pages/finance/CouponsPage'))
+const ShippingPage = lazy(() => import('./pages/finance/ShippingPage'))
 
-import TicketsList from './pages/tickets/TicketsList'
-import TicketDetail from './pages/tickets/TicketDetail'
+// Content
+const PagesManagement = lazy(() => import('./pages/content/PagesManagement'))
+const BlogPosts = lazy(() => import('./pages/content/BlogPosts'))
+const BannersPage = lazy(() => import('./pages/content/BannersPage'))
 
-import SettingsPage from './pages/settings/SettingsPage'
+// Tickets
+const TicketsList = lazy(() => import('./pages/tickets/TicketsList'))
+const TicketDetail = lazy(() => import('./pages/tickets/TicketDetail'))
 
-import SalesReports from './pages/reports/SalesReports'
-import ProductsReports from './pages/reports/ProductsReports'
-import CustomersReports from './pages/reports/CustomersReports'
+// Settings
+const SettingsPage = lazy(() => import('./pages/settings/SettingsPage'))
 
-import AdminsPage from './pages/admins/AdminsPage'
+// Reports
+const SalesReports = lazy(() => import('./pages/reports/SalesReports'))
+const ProductsReports = lazy(() => import('./pages/reports/ProductsReports'))
+const CustomersReports = lazy(() => import('./pages/reports/CustomersReports'))
+
+// Admins
+const AdminsPage = lazy(() => import('./pages/admins/AdminsPage'))
+
+// Auth Pages (Password Reset)
+const ForgotPasswordPage = lazy(() => import('./pages/ForgotPasswordPage'))
+const ResetPasswordPage = lazy(() => import('./pages/ResetPasswordPage'))
+
+// Loading fallback component
+const LoadingFallback = () => (
+  <div
+    style={{
+      display: 'flex',
+      justifyContent: 'center',
+      alignItems: 'center',
+      height: '100vh',
+    }}
+  >
+    <Spin size="large" tip="در حال بارگذاری..." />
+  </div>
+)
 
 function App() {
   const { isAuthenticated } = useAuthStore()
@@ -49,13 +82,32 @@ function App() {
         element={!isAuthenticated ? <LoginPage /> : <Navigate to="/" />}
       />
 
+      {/* Password Reset Pages - Public Routes */}
+      <Route
+        path="/forgot-password"
+        element={
+          <Suspense fallback={<LoadingFallback />}>
+            <ForgotPasswordPage />
+          </Suspense>
+        }
+      />
+      <Route
+        path="/reset-password/:token"
+        element={
+          <Suspense fallback={<LoadingFallback />}>
+            <ResetPasswordPage />
+          </Suspense>
+        }
+      />
+
       {/* Protected Routes */}
       <Route
         path="/*"
         element={
           isAuthenticated ? (
             <MainLayout>
-              <Routes>
+              <Suspense fallback={<LoadingFallback />}>
+                <Routes>
                 {/* Dashboard */}
                 <Route path="/" element={<Dashboard />} />
 
@@ -76,6 +128,7 @@ function App() {
                 <Route path="/categories" element={<CategoriesPage />} />
                 <Route path="/brands" element={<BrandsPage />} />
                 <Route path="/inventory" element={<InventoryPage />} />
+                <Route path="/reviews" element={<ReviewsPage />} />
 
                 {/* Orders */}
                 <Route path="/orders" element={<OrdersList />} />
@@ -114,6 +167,7 @@ function App() {
                 {/* 404 */}
                 <Route path="*" element={<Navigate to="/" />} />
               </Routes>
+              </Suspense>
             </MainLayout>
           ) : (
             <Navigate to="/login" />

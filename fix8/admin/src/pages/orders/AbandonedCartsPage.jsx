@@ -22,6 +22,7 @@ import {
   DollarOutlined,
   ClockCircleOutlined,
   EyeOutlined,
+  MessageOutlined,
 } from '@ant-design/icons'
 import dayjs from 'dayjs'
 import jalaliday from 'jalaliday'
@@ -118,15 +119,40 @@ function AbandonedCartsPage() {
     }
   }
 
-  const handleSendReminder = (cart) => {
+  const handleEmailReminder = async (cart) => {
     Modal.confirm({
       title: 'ارسال ایمیل یادآوری',
       content: `آیا می‌خواهید ایمیل یادآوری به ${cart.user?.name || cart.user?.email} ارسال شود؟`,
       okText: 'ارسال',
       cancelText: 'لغو',
-      onOk: () => {
-        // این قابلیت در آینده پیاده‌سازی می‌شود
-        message.info('این قابلیت در نسخه‌های بعدی فعال خواهد شد')
+      onOk: async () => {
+        try {
+          await api.post(`/carts/admin/remind/email/${cart._id}`)
+          message.success('ایمیل یادآوری با موفقیت ارسال شد')
+        } catch (err) {
+          const errorMsg = err?.response?.data?.message || 'خطا در ارسال ایمیل'
+          message.error(errorMsg)
+          console.error('Email reminder error:', err)
+        }
+      },
+    })
+  }
+
+  const handleSmsReminder = async (cart) => {
+    Modal.confirm({
+      title: 'ارسال پیامک یادآوری',
+      content: `آیا می‌خواهید پیامک یادآوری به شماره ${cart.user?.phone || 'نامشخص'} ارسال شود؟`,
+      okText: 'ارسال',
+      cancelText: 'لغو',
+      onOk: async () => {
+        try {
+          await api.post(`/carts/admin/remind/sms/${cart._id}`)
+          message.success('پیامک یادآوری با موفقیت ارسال شد')
+        } catch (err) {
+          const errorMsg = err?.response?.data?.message || 'خطا در ارسال پیامک'
+          message.error(errorMsg)
+          console.error('SMS reminder error:', err)
+        }
       },
     })
   }
@@ -192,10 +218,10 @@ function AbandonedCartsPage() {
     {
       title: 'عملیات',
       key: 'actions',
-      width: 200,
+      width: 280,
       align: 'center',
       render: (_, record) => (
-        <Space>
+        <Space size="small" wrap>
           <Button
             type="default"
             size="small"
@@ -208,9 +234,18 @@ function AbandonedCartsPage() {
             type="primary"
             size="small"
             icon={<MailOutlined />}
-            onClick={() => handleSendReminder(record)}
+            onClick={() => handleEmailReminder(record)}
           >
-            یادآوری
+            ایمیل
+          </Button>
+          <Button
+            type="primary"
+            size="small"
+            icon={<MessageOutlined />}
+            onClick={() => handleSmsReminder(record)}
+            style={{ backgroundColor: '#52c41a', borderColor: '#52c41a' }}
+          >
+            پیامک
           </Button>
         </Space>
       ),
@@ -350,15 +385,27 @@ function AbandonedCartsPage() {
             بستن
           </Button>,
           <Button
-            key="remind"
+            key="email"
             type="primary"
             icon={<MailOutlined />}
             onClick={() => {
-              handleSendReminder(selectedCart)
+              handleEmailReminder(selectedCart)
               setDetailOpen(false)
             }}
           >
-            ارسال یادآوری
+            یادآوری ایمیل
+          </Button>,
+          <Button
+            key="sms"
+            type="primary"
+            icon={<MessageOutlined />}
+            onClick={() => {
+              handleSmsReminder(selectedCart)
+              setDetailOpen(false)
+            }}
+            style={{ backgroundColor: '#52c41a', borderColor: '#52c41a' }}
+          >
+            یادآوری پیامک
           </Button>,
         ]}
         width={800}

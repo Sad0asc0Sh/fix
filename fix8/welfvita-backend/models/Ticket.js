@@ -56,6 +56,13 @@ const ticketSchema = new mongoose.Schema(
   { timestamps: true },
 )
 
+// ============================================
+// Database Indexes for Performance
+// ============================================
+// Compound index for common filter combinations
+ticketSchema.index({ status: 1, priority: 1, createdAt: -1 })
+ticketSchema.index({ user: 1, status: 1 })
+// Single field indexes
 ticketSchema.index({ user: 1 })
 ticketSchema.index({ status: 1 })
 ticketSchema.index({ priority: 1 })

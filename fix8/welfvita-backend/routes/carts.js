@@ -1,6 +1,11 @@
 const express = require('express')
 const router = express.Router()
-const { getAbandonedCarts, getCartStats } = require('../controllers/cartController')
+const {
+  getAbandonedCarts,
+  getCartStats,
+  sendEmailReminder,
+  sendSmsReminder,
+} = require('../controllers/cartController')
 const { protect, authorize } = require('../middleware/auth')
 
 // ============================================
@@ -23,6 +28,28 @@ router.get(
   protect,
   authorize('admin', 'manager', 'superadmin'),
   getCartStats,
+)
+
+// ============================================
+// POST /api/carts/admin/remind/email/:cartId - ارسال یادآوری ایمیل
+// فقط برای ادمین
+// ============================================
+router.post(
+  '/admin/remind/email/:cartId',
+  protect,
+  authorize('admin', 'manager', 'superadmin'),
+  sendEmailReminder,
+)
+
+// ============================================
+// POST /api/carts/admin/remind/sms/:cartId - ارسال یادآوری پیامک
+// فقط برای ادمین
+// ============================================
+router.post(
+  '/admin/remind/sms/:cartId',
+  protect,
+  authorize('admin', 'manager', 'superadmin'),
+  sendSmsReminder,
 )
 
 // در آینده روت‌های زیر برای فرانت‌اند سایت مشتری اضافه خواهد شد:

@@ -1,10 +1,42 @@
 const express = require('express')
 const router = express.Router()
+const ExcelJS = require('exceljs')
+const csv = require('csv-parser')
+const fs = require('fs')
+const multer = require('multer')
+const path = require('path')
 
 const Product = require('../models/Product')
 const Category = require('../models/Category')
+const Brand = require('../models/Brand')
 const { protect, authorize } = require('../middleware/auth')
 const { upload, cloudinary } = require('../middleware/upload')
+
+// Multer configuration for CSV upload (local storage)
+const csvStorage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    const uploadDir = path.join(__dirname, '../uploads/csv')
+    if (!fs.existsSync(uploadDir)) {
+      fs.mkdirSync(uploadDir, { recursive: true })
+    }
+    cb(null, uploadDir)
+  },
+  filename: (req, file, cb) => {
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1e9)
+    cb(null, 'import-' + uniqueSuffix + path.extname(file.originalname))
+  },
+})
+
+const csvUpload = multer({
+  storage: csvStorage,
+  fileFilter: (req, file, cb) => {
+    if (file.mimetype === 'text/csv' || path.extname(file.originalname) === '.csv') {
+      cb(null, true)
+    } else {
+      cb(new Error('فقط فایل‌های CSV مجاز هستند'))
+    }
+  },
+})
 
 // ============================================
 // Helpers
@@ -468,5 +500,218 @@ router.put(
   },
 )
 
-module.exports = router
+// ============================================
+// GET /api/products/export/excel - Export products to Excel
+// ============================================
+router.get(
+  '/export/excel',
+  protect,
+  authorize('admin', 'manager', 'superadmin'),
+  async (req, res) => {
+    try {
+      // Fetch all products with valid category references (for Excel export)
+      const products = await Product.find({
+        $or: [
+          { category: { $type: 'objectId' } },
+          { category: { $exists: false } },
+          { category: null },
+        ],
+      }).lean()
 
+      // Create a new workbook
+      const workbook = new ExcelJS.Workbook()
+      const worksheet = workbook.addWorksheet('محصولات')
+
+      // Define columns
+      worksheet.columns = [
+        { header: 'نام محصول', key: 'name', width: 30 },
+        { header: 'SKU', key: 'sku', width: 15 },
+        { header: 'نوع محصول', key: 'productType', width: 15 },
+        { header: 'قیمت', key: 'price', width: 15 },
+        { header: 'قیمت مقایسه', key: 'compareAtPrice', width: 15 },
+        { header: 'موجودی', key: 'stock', width: 10 },
+        { header: 'دسته‌بندی', key: 'category', width: 20 },
+        { header: 'برند', key: 'brand', width: 20 },
+        { header: 'امتیاز', key: 'rating', width: 10 },
+        { header: 'تعداد نظرات', key: 'numReviews', width: 12 },
+        { header: 'ویژه', key: 'isFeatured', width: 10 },
+        { header: 'فعال', key: 'isActive', width: 10 },
+      ]
+
+      // Add rows
+      products.forEach((product) => {
+        worksheet.addRow({
+          name: product.name || '',
+          sku: product.sku || '',
+          productType: product.productType || 'simple',
+          price: product.price || 0,
+          compareAtPrice: product.compareAtPrice || '',
+          stock: product.stock || 0,
+          category: product.category?.name || '',
+          brand: product.brand?.name || '',
+          rating: product.rating || 0,
+          numReviews: product.numReviews || 0,
+          isFeatured: product.isFeatured ? 'بله' : 'خیر',
+          isActive: product.isActive ? 'بله' : 'خیر',
+        })
+      })
+
+      // Style header row
+      worksheet.getRow(1).font = { bold: true }
+      worksheet.getRow(1).fill = {
+        type: 'pattern',
+        pattern: 'solid',
+        fgColor: { argb: 'FFE0E0E0' },
+      }
+
+      // Set response headers for file download
+      res.setHeader(
+        'Content-Type',
+        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      )
+      res.setHeader('Content-Disposition', 'attachment; filename=products.xlsx')
+
+      // Generate buffer and send as response
+      const buffer = await workbook.xlsx.writeBuffer()
+      res.send(buffer)
+    } catch (error) {
+      console.error('Error exporting products to Excel:', error)
+      res.status(500).json({
+        success: false,
+        message: 'خطا در برون‌ریزی محصولات به Excel',
+        error: error.message,
+      })
+    }
+  },
+)
+
+// ============================================
+// POST /api/products/import/csv - Import products from CSV
+// ============================================
+router.post(
+  '/import/csv',
+  protect,
+  authorize('admin', 'manager', 'superadmin'),
+  csvUpload.single('file'),
+  async (req, res) => {
+    try {
+      if (!req.file) {
+        return res.status(400).json({
+          success: false,
+          message: 'فایل CSV آپلود نشده است',
+        })
+      }
+
+      const filePath = req.file.path
+      const products = []
+      const errors = []
+
+      // Read CSV file
+      fs.createReadStream(filePath)
+        .pipe(csv())
+        .on('data', (row) => {
+          products.push(row)
+        })
+        .on('end', async () => {
+          try {
+            const productsToCreate = []
+
+            for (let i = 0; i < products.length; i++) {
+              const row = products[i]
+
+              try {
+                // Find category by name
+                let categoryId = null
+                if (row.category) {
+                  const category = await Category.findOne({ name: row.category.trim() })
+                  if (category) {
+                    categoryId = category._id
+                  }
+                }
+
+                // Find brand by name
+                let brandId = null
+                if (row.brand) {
+                  const brand = await Brand.findOne({ name: row.brand.trim() })
+                  if (brand) {
+                    brandId = brand._id
+                  }
+                }
+
+                // Create product object
+                const productData = {
+                  name: row.name || `محصول ${i + 1}`,
+                  sku: row.sku || '',
+                  productType: row.productType || 'simple',
+                  price: parseFloat(row.price) || 0,
+                  compareAtPrice: row.compareAtPrice ? parseFloat(row.compareAtPrice) : undefined,
+                  stock: parseInt(row.stock) || 0,
+                  category: categoryId,
+                  brand: brandId,
+                  description: row.description || '',
+                  isActive: row.isActive === 'بله' || row.isActive === 'true' || row.isActive === '1',
+                  isFeatured:
+                    row.isFeatured === 'بله' || row.isFeatured === 'true' || row.isFeatured === '1',
+                }
+
+                productsToCreate.push(productData)
+              } catch (rowError) {
+                errors.push(`خطا در ردیف ${i + 1}: ${rowError.message}`)
+              }
+            }
+
+            // Insert products in bulk
+            if (productsToCreate.length > 0) {
+              await Product.insertMany(productsToCreate)
+            }
+
+            // Delete uploaded file
+            fs.unlinkSync(filePath)
+
+            // Send response
+            const message = `تعداد ${productsToCreate.length} محصول با موفقیت درون‌ریزی شد`
+            res.json({
+              success: true,
+              message,
+              imported: productsToCreate.length,
+              errors: errors.length > 0 ? errors : undefined,
+            })
+          } catch (error) {
+            // Delete uploaded file on error
+            if (fs.existsSync(filePath)) {
+              fs.unlinkSync(filePath)
+            }
+
+            console.error('Error processing CSV:', error)
+            res.status(500).json({
+              success: false,
+              message: 'خطا در پردازش فایل CSV',
+              error: error.message,
+            })
+          }
+        })
+        .on('error', (error) => {
+          // Delete uploaded file on error
+          if (fs.existsSync(filePath)) {
+            fs.unlinkSync(filePath)
+          }
+
+          console.error('Error reading CSV:', error)
+          res.status(500).json({
+            success: false,
+            message: 'خطا در خواندن فایل CSV',
+            error: error.message,
+          })
+        })
+    } catch (error) {
+      console.error('Error importing products from CSV:', error)
+      res.status(500).json({
+        success: false,
+        message: 'خطا در درون‌ریزی محصولات از CSV',
+        error: error.message,
+      })
+    }
+  },
+)
+
+module.exports = router

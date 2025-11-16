@@ -206,6 +206,19 @@ const ProductSchema = new mongoose.Schema(
   },
 )
 
+// ============================================
+// Database Indexes for Performance
+// ============================================
+// Compound index for common filter combinations
+ProductSchema.index({ productType: 1, category: 1, brand: 1 })
+ProductSchema.index({ isActive: 1, productType: 1 })
+// Text index for search
+ProductSchema.index({ name: 'text', description: 'text' })
+// Single field indexes
+ProductSchema.index({ category: 1 })
+ProductSchema.index({ brand: 1 })
+ProductSchema.index({ slug: 1 })
+
 // Simple slug generator from name if not provided
 ProductSchema.pre('save', function (next) {
   if (this.isModified('name') && !this.slug) {

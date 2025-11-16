@@ -1,4 +1,5 @@
 const Cart = require('../models/Cart')
+const { sendReminderEmail, sendReminderSMS } = require('../utils/notificationService')
 
 // ============================================
 // GET /api/carts/admin/abandoned - دریافت سبدهای رها شده
@@ -110,6 +111,114 @@ exports.getCartStats = async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'خطا در دریافت آمار سبدها',
+      error: error.message,
+    })
+  }
+}
+
+// ============================================
+// POST /api/carts/admin/remind/email/:cartId - ارسال یادآوری ایمیل
+// فقط برای ادمین
+// ============================================
+exports.sendEmailReminder = async (req, res) => {
+  try {
+    const { cartId } = req.params
+
+    // یافتن سبد خرید و populate کردن اطلاعات
+    const cart = await Cart.findById(cartId)
+      .populate('user', 'name email')
+      .populate('items.product', 'name images price')
+      .lean()
+
+    if (!cart) {
+      return res.status(404).json({
+        success: false,
+        message: 'سبد خرید یافت نشد',
+      })
+    }
+
+    // بررسی وجود ایمیل کاربر
+    if (!cart.user || !cart.user.email) {
+      return res.status(400).json({
+        success: false,
+        message: 'ایمیل کاربر یافت نشد',
+      })
+    }
+
+    // بررسی وجود آیتم‌ها
+    if (!cart.items || cart.items.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'سبد خرید خالی است',
+      })
+    }
+
+    // ارسال ایمیل
+    await sendReminderEmail(cart.user.email, cart.user.name, cart.items)
+
+    res.json({
+      success: true,
+      message: 'ایمیل یادآوری با موفقیت ارسال شد',
+    })
+  } catch (error) {
+    console.error('Error sending email reminder:', error)
+    res.status(500).json({
+      success: false,
+      message: 'خطا در ارسال ایمیل یادآوری',
+      error: error.message,
+    })
+  }
+}
+
+// ============================================
+// POST /api/carts/admin/remind/sms/:cartId - ارسال یادآوری پیامک
+// فقط برای ادمین
+// ============================================
+exports.sendSmsReminder = async (req, res) => {
+  try {
+    const { cartId } = req.params
+
+    // یافتن سبد خرید و populate کردن اطلاعات
+    const cart = await Cart.findById(cartId)
+      .populate('user', 'name phone')
+      .lean()
+
+    if (!cart) {
+      return res.status(404).json({
+        success: false,
+        message: 'سبد خرید یافت نشد',
+      })
+    }
+
+    // بررسی وجود شماره موبایل کاربر
+    if (!cart.user || !cart.user.phone) {
+      return res.status(400).json({
+        success: false,
+        message: 'شماره موبایل کاربر یافت نشد',
+      })
+    }
+
+    // بررسی وجود آیتم‌ها
+    if (!cart.items || cart.items.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'سبد خرید خالی است',
+      })
+    }
+
+    // ارسال پیامک
+    const itemsCount = cart.items.reduce((sum, item) => sum + item.quantity, 0)
+    await sendReminderSMS(cart.user.phone, cart.user.name, itemsCount)
+
+    res.json({
+      success: true,
+      message: 'پیامک یادآوری با موفقیت ارسال شد',
+    })
+  } catch (error) {
+    console.error('Error sending SMS reminder:', error)
+    res.status(500).json({
+      success: false,
+      message: 'خطا در ارسال پیامک یادآوری',
       error: error.message,
     })
   }

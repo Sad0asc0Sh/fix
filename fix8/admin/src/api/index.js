@@ -29,14 +29,35 @@ api.interceptors.request.use((config) => {
   return config
 })
 
-// Optional: normalize API errors
+// Optional: normalize API errors & handle auth expiry
 api.interceptors.response.use(
   (res) => res,
   (error) => {
-    const message = error?.response?.data?.message || error?.message || 'Request failed'
-    return Promise.reject(new Error(message))
-  }
+    const status = error?.response?.status
+    const url = error?.config?.url || ''
+    const messageText =
+      error?.response?.data?.message || error?.message || 'Request failed'
+
+    const isLoginEndpoint =
+      url.endsWith('/auth/login') || url.endsWith('/auth/admin/login')
+
+    if (status === 401 && !isLoginEndpoint) {
+      try {
+        const { logout } = useAuthStore.getState() || {}
+        if (logout) {
+          logout()
+        }
+      } catch (_) {
+        // ignore
+      }
+
+      if (typeof window !== 'undefined' && window.location) {
+        window.location.href = '/login'
+      }
+    }
+
+    return Promise.reject(new Error(messageText))
+  },
 )
 
 export default api
-

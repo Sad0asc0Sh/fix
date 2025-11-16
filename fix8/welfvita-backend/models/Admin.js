@@ -1,5 +1,6 @@
 const mongoose = require('mongoose')
 const bcrypt = require('bcryptjs')
+const crypto = require('crypto')
 
 // این اسکیمای اصلی کاربر است (هم یوزر، هم ادمین)
 // بر اساس مستندات، همه اکانت‌ها در کالکشن `users` ذخیره می‌شوند
@@ -47,6 +48,17 @@ const UserSchema = new mongoose.Schema(
       type: String,
       default: null,
     },
+
+    // فیلدهای بازنشانی رمز عبور
+    resetPasswordToken: {
+      type: String,
+      default: null,
+    },
+
+    resetPasswordExpire: {
+      type: Date,
+      default: null,
+    },
   },
   {
     timestamps: true,
@@ -82,6 +94,21 @@ UserSchema.methods.toJSON = function () {
   const obj = this.toObject()
   delete obj.password
   return obj
+}
+
+// متد ایجاد توکن بازنشانی رمز عبور
+UserSchema.methods.getResetPasswordToken = function () {
+  // 1. ساخت توکن تصادفی
+  const resetToken = crypto.randomBytes(20).toString('hex')
+
+  // 2. هش کردن توکن و ذخیره آن در دیتابیس (برای امنیت)
+  this.resetPasswordToken = crypto.createHash('sha256').update(resetToken).digest('hex')
+
+  // 3. تنظیم زمان انقضا (10 دقیقه)
+  this.resetPasswordExpire = Date.now() + 10 * 60 * 1000
+
+  // 4. برگرداندن توکن اصلی (هش نشده) برای ارسال در ایمیل
+  return resetToken
 }
 
 // توجه: عمداً نام مدل را User انتخاب می‌کنیم تا از کالکشن `users` استفاده شود.

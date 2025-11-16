@@ -19,8 +19,6 @@ import {
 import {
   useAuthStore,
   useNotificationStore,
-  useCategoryStore,
-  useBrandStore,
 } from '../../stores'
 import './MainLayout.css'
 
@@ -32,25 +30,6 @@ function MainLayout({ children }) {
   const location = useLocation()
   const { user, logout } = useAuthStore()
   const { notifications, markAllAsRead, deleteNotification } = useNotificationStore()
-
-  const fetchCategoriesTree = useCategoryStore(
-    (state) => state.fetchCategoriesTree,
-  )
-  const categoriesLoaded = useCategoryStore(
-    (state) => state.categoriesTree.length > 0,
-  )
-
-  const fetchBrands = useBrandStore((state) => state.fetchBrands)
-  const brandsLoaded = useBrandStore((state) => state.brands.length > 0)
-
-  useEffect(() => {
-    if (!categoriesLoaded) {
-      fetchCategoriesTree()
-    }
-    if (!brandsLoaded) {
-      fetchBrands()
-    }
-  }, [fetchCategoriesTree, categoriesLoaded, fetchBrands, brandsLoaded])
 
   const unreadCount = notifications.filter((n) => !n.read).length
 
@@ -81,6 +60,10 @@ function MainLayout({ children }) {
         {
           key: '/inventory',
           label: <Link to="/inventory">مدیریت موجودی</Link>,
+        },
+        {
+          key: '/reviews',
+          label: <Link to="/reviews">مدیریت نظرات</Link>,
         },
       ],
     },
