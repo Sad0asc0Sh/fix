@@ -1,202 +1,509 @@
 import { useEffect, useState } from 'react'
-import { Card, Table, Tag, Input, Select, Space, Button, Modal, Descriptions, Form, message } from 'antd'
+import {
+  Card,
+  Table,
+  Tag,
+  Input,
+  Select,
+  Button,
+  Modal,
+  Descriptions,
+  message,
+  Space,
+  Image,
+  InputNumber,
+  Divider,
+} from 'antd'
+import {
+  SearchOutlined,
+  ReloadOutlined,
+  SettingOutlined,
+} from '@ant-design/icons'
+import dayjs from 'dayjs'
+import jalaliday from 'jalaliday'
 import api from '../../api'
 
+const { TextArea } = Input
+
+// فعال‌سازی تقویم جلالی
+dayjs.extend(jalaliday)
+dayjs.calendar('jalali')
+
+// نام ماه‌های شمسی
+const persianMonths = [
+  'فروردین',
+  'اردیبهشت',
+  'خرداد',
+  'تیر',
+  'مرداد',
+  'شهریور',
+  'مهر',
+  'آبان',
+  'آذر',
+  'دی',
+  'بهمن',
+  'اسفند',
+]
+
+// تابع برای فرمت کردن تاریخ با نام ماه فارسی
+const formatPersianDate = (date, includeTime = false) => {
+  if (!date) return '—'
+  const jalaliDate = dayjs(date).calendar('jalali').locale('fa')
+  const year = jalaliDate.format('YYYY')
+  const month = persianMonths[parseInt(jalaliDate.format('M')) - 1]
+  const day = jalaliDate.format('DD')
+
+  if (includeTime) {
+    const time = jalaliDate.format('HH:mm')
+    return `${day} ${month} ${year} - ساعت ${time}`
+  }
+  return `${day} ${month} ${year}`
+}
+
 function RMAPage() {
-  const [data, setData] = useState([])
+  const [rmas, setRmas] = useState([])
   const [loading, setLoading] = useState(false)
-  const [pagination, setPagination] = useState({ current: 1, pageSize: 20, total: 0 })
-  const [status, setStatus] = useState()
-  const [userId, setUserId] = useState('')
-  const [orderId, setOrderId] = useState('')
+  const [filters, setFilters] = useState({
+    status: null,
+    orderId: '',
+  })
+  const [pagination, setPagination] = useState({
+    current: 1,
+    pageSize: 20,
+    total: 0,
+  })
 
+  // Modal مدیریت
   const [manageOpen, setManageOpen] = useState(false)
-  const [selectedId, setSelectedId] = useState(null)
-  const [detail, setDetail] = useState(null)
+  const [selectedRMA, setSelectedRMA] = useState(null)
   const [detailLoading, setDetailLoading] = useState(false)
-  const [detailStatus, setDetailStatus] = useState('pending')
-  const [detailNotes, setDetailNotes] = useState('')
-
-  const [createOpen, setCreateOpen] = useState(false)
-  const [createForm] = Form.useForm()
-  const [creating, setCreating] = useState(false)
+  const [newStatus, setNewStatus] = useState('')
+  const [adminNotes, setAdminNotes] = useState('')
+  const [refundAmount, setRefundAmount] = useState(0)
+  const [saving, setSaving] = useState(false)
 
   const fetchRMAs = async (page = pagination.current, pageSize = pagination.pageSize) => {
     setLoading(true)
     try {
-      const params = { page, limit: pageSize, sort: '-createdAt' }
-      if (status) params.status = status
-      if (userId) params.userId = userId
-      if (orderId) params.orderId = orderId
-      const res = await api.get('/rma/admin/all', { params })
+      const params = new URLSearchParams()
+      params.set('page', String(page))
+      params.set('limit', String(pageSize))
+
+      if (filters.status) {
+        params.set('status', filters.status)
+      }
+      if (filters.orderId) {
+        params.set('orderId', filters.orderId)
+      }
+
+      const res = await api.get('/rma/admin', { params })
       const list = res?.data?.data || []
       const pg = res?.data?.pagination
-      setData(list)
-      if (pg) setPagination({ current: pg.currentPage || page, pageSize, total: pg.totalItems || list.length })
+
+      setRmas(list)
+      if (pg) {
+        setPagination({
+          current: pg.currentPage || page,
+          pageSize: pg.itemsPerPage || pageSize,
+          total: pg.totalItems || list.length,
+        })
+      }
     } catch (err) {
-      message.error(err?.message || 'خطا در دریافت RMA')
+      const errorMsg = err?.response?.data?.message || err?.message || 'خطا در دریافت لیست مرجوعی‌ها'
+      message.error(errorMsg)
+      console.error('Fetch RMAs error:', err)
     } finally {
       setLoading(false)
     }
   }
 
-  useEffect(() => { fetchRMAs(1, pagination.pageSize) }, [status])
+  useEffect(() => {
+    fetchRMAs(1, pagination.pageSize)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filters.status])
 
-  const openManage = async (id) => {
+  const openManageModal = async (rmaId) => {
     setManageOpen(true)
-    setSelectedId(id)
     setDetailLoading(true)
     try {
-      const res = await api.get(`/rma/${id}`)
-      const d = res?.data?.data
-      setDetail(d)
-      setDetailStatus(d?.status || 'pending')
-      setDetailNotes(d?.adminNotes || '')
+      const res = await api.get(`/rma/${rmaId}`)
+      const rmaData = res?.data?.data
+      setSelectedRMA(rmaData)
+      setNewStatus(rmaData?.status || 'Pending')
+      setAdminNotes(rmaData?.adminNotes || '')
+      setRefundAmount(rmaData?.refundAmount || 0)
     } catch (err) {
-      message.error(err?.message || 'خطا در دریافت جزئیات RMA')
+      const errorMsg = err?.response?.data?.message || err?.message || 'خطا در دریافت جزئیات مرجوعی'
+      message.error(errorMsg)
     } finally {
       setDetailLoading(false)
     }
   }
 
-  const saveManage = async () => {
-    if (!selectedId) return
+  const handleSaveChanges = async () => {
+    if (!selectedRMA) return
+
+    if (!newStatus) {
+      message.warning('وضعیت جدید را انتخاب کنید')
+      return
+    }
+
+    setSaving(true)
     try {
-      setDetailLoading(true)
-      await api.put(`/rma/${selectedId}/status`, { status: detailStatus, adminNotes: detailNotes })
-      message.success('به‌روزرسانی شد')
+      await api.put(`/rma/${selectedRMA._id}/status`, {
+        status: newStatus,
+        adminNotes: adminNotes || undefined,
+        refundAmount: refundAmount || 0,
+      })
+      message.success('وضعیت مرجوعی با موفقیت به‌روزرسانی شد')
       setManageOpen(false)
-      setSelectedId(null)
+      setSelectedRMA(null)
       fetchRMAs()
     } catch (err) {
-      message.error(err?.message || 'به‌روزرسانی انجام نشد')
+      const errorMsg = err?.response?.data?.message || err?.message || 'خطا در به‌روزرسانی وضعیت'
+      message.error(errorMsg)
     } finally {
-      setDetailLoading(false)
+      setSaving(false)
     }
+  }
+
+  const getStatusColor = (status) => {
+    const colors = {
+      Pending: 'orange',
+      Approved: 'green',
+      Rejected: 'red',
+      Processing: 'blue',
+      Completed: 'cyan',
+    }
+    return colors[status] || 'default'
+  }
+
+  const getStatusLabel = (status) => {
+    const labels = {
+      Pending: 'در انتظار',
+      Approved: 'تأیید شده',
+      Rejected: 'رد شده',
+      Processing: 'در حال پردازش',
+      Completed: 'کامل شده',
+    }
+    return labels[status] || status
   }
 
   const columns = [
-    { title: 'شماره سفارش', key: 'order', dataIndex: ['order','orderNumber'] },
-    { title: 'کاربر', key: 'user', render: (_, r) => r.user ? `${r.user.name} (${r.user.email})` : '-' },
-    { title: 'علت', dataIndex: 'reason', key: 'reason' },
-    { title: 'آیتم‌ها', key: 'items', render: (r) => (r.items||[]).reduce((s,it)=> s + (it.quantity||0), 0) },
-    { title: 'وضعیت', dataIndex: 'status', key: 'status', render: (s) => <Tag color={s==='approved'?'green':s==='rejected'?'red':s==='processing'?'blue':s==='completed'?'cyan':'orange'}>{s}</Tag> },
-    { title: 'تاریخ', dataIndex: 'createdAt', key: 'createdAt', render: (d) => d ? new Date(d).toLocaleString('fa-IR') : '-' },
-    { title: 'مدیریت', key: 'actions', render: (_, r) => <Button onClick={() => openManage(r._id)}>مدیریت</Button> },
+    {
+      title: 'شماره سفارش',
+      key: 'orderId',
+      width: 150,
+      render: (_, record) => (
+        <span style={{ fontFamily: 'monospace', fontSize: '0.85em' }}>
+          #{record.order?._id?.slice(-8) || '—'}
+        </span>
+      ),
+    },
+    {
+      title: 'مشتری',
+      key: 'customer',
+      ellipsis: true,
+      render: (_, record) =>
+        record.user ? `${record.user.name || '—'} (${record.user.email || '—'})` : '—',
+    },
+    {
+      title: 'دلیل مرجوعی',
+      dataIndex: 'reason',
+      key: 'reason',
+      ellipsis: true,
+    },
+    {
+      title: 'تعداد آیتم',
+      key: 'itemsCount',
+      align: 'center',
+      width: 100,
+      render: (_, record) => {
+        const totalQuantity = (record.items || []).reduce((sum, item) => sum + (item.quantity || 0), 0)
+        return totalQuantity || 0
+      },
+    },
+    {
+      title: 'وضعیت',
+      dataIndex: 'status',
+      key: 'status',
+      width: 140,
+      render: (status) => (
+        <Tag color={getStatusColor(status)}>{getStatusLabel(status)}</Tag>
+      ),
+    },
+    {
+      title: 'مبلغ بازپرداختی',
+      dataIndex: 'refundAmount',
+      key: 'refundAmount',
+      width: 150,
+      render: (amount) =>
+        amount > 0
+          ? `${new Intl.NumberFormat('fa-IR').format(amount)} تومان`
+          : '—',
+    },
+    {
+      title: 'تاریخ درخواست',
+      dataIndex: 'createdAt',
+      key: 'createdAt',
+      width: 220,
+      render: (date) => formatPersianDate(date, true),
+    },
+    {
+      title: 'عملیات',
+      key: 'actions',
+      width: 120,
+      align: 'center',
+      render: (_, record) => (
+        <Button
+          type="primary"
+          size="small"
+          icon={<SettingOutlined />}
+          onClick={() => openManageModal(record._id)}
+        >
+          مدیریت
+        </Button>
+      ),
+    },
   ]
 
   const onTableChange = (pag) => {
-    setPagination((prev) => ({ ...prev, current: pag.current, pageSize: pag.pageSize }))
+    setPagination((prev) => ({
+      ...prev,
+      current: pag.current,
+      pageSize: pag.pageSize,
+    }))
     fetchRMAs(pag.current, pag.pageSize)
-  }
-
-  const createRMA = async () => {
-    try {
-      const values = await createForm.validateFields()
-      setCreating(true)
-      await api.post('/rma', values)
-      message.success('RMA ایجاد شد')
-      setCreateOpen(false)
-      createForm.resetFields()
-      fetchRMAs()
-    } catch (err) {
-      if (!err?.errorFields) message.error(err?.message || 'ایجاد انجام نشد')
-    } finally {
-      setCreating(false)
-    }
   }
 
   return (
     <div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 16, gap: 12, flexWrap: 'wrap' }}>
-        <h1>درخواست‌های بازگشت (RMA)</h1>
-        <Space>
-          <Select placeholder="وضعیت" style={{ width: 160 }} allowClear onChange={setStatus}>
-            {['pending','approved','rejected','processing','completed'].map(s => (
-              <Select.Option key={s} value={s}>{s}</Select.Option>
-            ))}
-          </Select>
-          <Input placeholder="User ID" style={{ width: 220 }} allowClear value={userId} onChange={(e)=>setUserId(e.target.value)} onPressEnter={()=>fetchRMAs(1,pagination.pageSize)} onBlur={()=>fetchRMAs(1,pagination.pageSize)} />
-          <Input placeholder="Order ID" style={{ width: 220 }} allowClear value={orderId} onChange={(e)=>setOrderId(e.target.value)} onPressEnter={()=>fetchRMAs(1,pagination.pageSize)} onBlur={()=>fetchRMAs(1,pagination.pageSize)} />
-          <Button type="primary" onClick={()=>fetchRMAs(1, pagination.pageSize)}>اعمال فیلتر</Button>
-          <Button onClick={()=>{ setStatus(undefined); setUserId(''); setOrderId(''); fetchRMAs(1, pagination.pageSize) }}>ریست</Button>
-          <Button onClick={()=>setCreateOpen(true)}>ثبت RMA دستی</Button>
-        </Space>
+      <div
+        style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          marginBottom: 16,
+        }}
+      >
+        <h1>مدیریت مرجوعی (RMA)</h1>
+        <Button
+          icon={<ReloadOutlined />}
+          onClick={() => fetchRMAs()}
+        >
+          بارگذاری مجدد
+        </Button>
       </div>
+
+      <div
+        style={{
+          marginBottom: 16,
+          display: 'flex',
+          gap: 16,
+          flexWrap: 'wrap',
+        }}
+      >
+        <Input
+          placeholder="جستجو بر اساس شماره سفارش..."
+          prefix={<SearchOutlined />}
+          style={{ width: 300 }}
+          allowClear
+          value={filters.orderId}
+          onChange={(e) =>
+            setFilters((prev) => ({ ...prev, orderId: e.target.value }))
+          }
+          onPressEnter={() => fetchRMAs(1, pagination.pageSize)}
+          onBlur={() => fetchRMAs(1, pagination.pageSize)}
+        />
+        <Select
+          placeholder="وضعیت مرجوعی"
+          style={{ width: 180 }}
+          allowClear
+          onChange={(value) =>
+            setFilters((prev) => ({ ...prev, status: value || null }))
+          }
+        >
+          <Select.Option value="Pending">در انتظار</Select.Option>
+          <Select.Option value="Approved">تأیید شده</Select.Option>
+          <Select.Option value="Rejected">رد شده</Select.Option>
+          <Select.Option value="Processing">در حال پردازش</Select.Option>
+          <Select.Option value="Completed">کامل شده</Select.Option>
+        </Select>
+      </div>
+
       <Card>
         <Table
           columns={columns}
-          dataSource={data}
+          dataSource={rmas}
           loading={loading}
           rowKey="_id"
-          pagination={{ current: pagination.current, pageSize: pagination.pageSize, total: pagination.total, showSizeChanger: true }}
+          pagination={{
+            current: pagination.current,
+            pageSize: pagination.pageSize,
+            total: pagination.total,
+            showSizeChanger: true,
+            showTotal: (total) => `${total} درخواست`,
+          }}
           onChange={onTableChange}
+          locale={{
+            emptyText: (
+              <div
+                style={{
+                  textAlign: 'center',
+                  padding: '40px 0',
+                  color: '#999',
+                }}
+              >
+                <p>هیچ درخواست مرجوعی یافت نشد</p>
+              </div>
+            ),
+          }}
         />
       </Card>
 
-      <Modal open={manageOpen} onCancel={()=>setManageOpen(false)} onOk={saveManage} okText="ذخیره تغییرات" confirmLoading={detailLoading} title="مدیریت RMA">
+      {/* Modal مدیریت RMA */}
+      <Modal
+        open={manageOpen}
+        onCancel={() => {
+          setManageOpen(false)
+          setSelectedRMA(null)
+        }}
+        onOk={handleSaveChanges}
+        okText="ذخیره تغییرات"
+        cancelText="لغو"
+        confirmLoading={saving}
+        width={800}
+        title={`مدیریت درخواست مرجوعی #${selectedRMA?._id?.slice(-8) || ''}`}
+      >
         <Card loading={detailLoading} bordered={false}>
-          {detail && (
-            <>
-              <Descriptions bordered size="small">
-                <Descriptions.Item label="کاربر">{detail.user ? `${detail.user.name} (${detail.user.email})` : '-'}</Descriptions.Item>
-                <Descriptions.Item label="سفارش">{detail.order?.orderNumber || '-'}</Descriptions.Item>
-                <Descriptions.Item label="علت" span={2}>{detail.reason}</Descriptions.Item>
-                <Descriptions.Item label="وضعیت" span={2}><Tag>{detail.status}</Tag></Descriptions.Item>
-              </Descriptions>
-
-              <div style={{ marginTop: 12 }}>
-                <strong>آیتم‌ها:</strong>
-                <ul>
-                  {(detail.items || []).map((it, idx) => (
-                    <li key={idx}>{it.product?.name || it.product} × {it.quantity}</li>
-                  ))}
-                </ul>
+          {selectedRMA && (
+            <Space direction="vertical" style={{ width: '100%' }} size="large">
+              {/* اطلاعات کلی */}
+              <div>
+                <h3>اطلاعات درخواست</h3>
+                <Descriptions bordered size="small" column={2}>
+                  <Descriptions.Item label="شماره سفارش">
+                    <span style={{ fontFamily: 'monospace' }}>
+                      #{selectedRMA.order?._id || '—'}
+                    </span>
+                  </Descriptions.Item>
+                  <Descriptions.Item label="وضعیت سفارش">
+                    {selectedRMA.order?.orderStatus || '—'}
+                  </Descriptions.Item>
+                  <Descriptions.Item label="مشتری">
+                    {selectedRMA.user?.name || '—'}
+                  </Descriptions.Item>
+                  <Descriptions.Item label="ایمیل">
+                    {selectedRMA.user?.email || '—'}
+                  </Descriptions.Item>
+                  <Descriptions.Item label="دلیل مرجوعی" span={2}>
+                    {selectedRMA.reason || '—'}
+                  </Descriptions.Item>
+                  <Descriptions.Item label="وضعیت فعلی">
+                    <Tag color={getStatusColor(selectedRMA.status)}>
+                      {getStatusLabel(selectedRMA.status)}
+                    </Tag>
+                  </Descriptions.Item>
+                  <Descriptions.Item label="تاریخ درخواست">
+                    {formatPersianDate(selectedRMA.createdAt, true)}
+                  </Descriptions.Item>
+                </Descriptions>
               </div>
 
-              <div style={{ marginTop: 12, display: 'flex', gap: 8, alignItems: 'center' }}>
-                <span>وضعیت جدید:</span>
-                <Select value={detailStatus} onChange={setDetailStatus} style={{ width: 200 }}>
-                  {['pending','approved','rejected','processing','completed'].map(s => (
-                    <Select.Option key={s} value={s}>{s}</Select.Option>
-                  ))}
-                </Select>
+              {/* آیتم‌های مرجوعی */}
+              <div>
+                <h3>محصولات مرجوعی</h3>
+                {selectedRMA.items && selectedRMA.items.length > 0 ? (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                    {selectedRMA.items.map((item, index) => (
+                      <Card key={index} size="small" style={{ background: '#fafafa' }}>
+                        <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
+                          {item.product?.images && item.product.images[0] && (
+                            <Image
+                              src={
+                                typeof item.product.images[0] === 'string'
+                                  ? item.product.images[0]
+                                  : item.product.images[0]?.url
+                              }
+                              width={50}
+                              height={50}
+                              style={{ borderRadius: 4 }}
+                            />
+                          )}
+                          <div style={{ flex: 1 }}>
+                            <div><strong>{item.product?.name || 'محصول حذف شده'}</strong></div>
+                            <div style={{ fontSize: '0.9em', color: '#666' }}>
+                              SKU: {item.product?.sku || '—'} | تعداد: {item.quantity} |
+                              قیمت: {item.price ? `${new Intl.NumberFormat('fa-IR').format(item.price)} تومان` : '—'}
+                            </div>
+                          </div>
+                        </div>
+                      </Card>
+                    ))}
+                  </div>
+                ) : (
+                  <p style={{ color: '#999' }}>هیچ محصولی ثبت نشده است</p>
+                )}
               </div>
 
-              <div style={{ marginTop: 12 }}>
-                <Form layout="vertical">
-                  <Form.Item label="یادداشت ادمین">
-                    <Input.TextArea rows={3} value={detailNotes} onChange={(e)=>setDetailNotes(e.target.value)} />
-                  </Form.Item>
-                </Form>
+              <Divider />
+
+              {/* مدیریت وضعیت */}
+              <div>
+                <h3>تغییر وضعیت</h3>
+                <Space direction="vertical" style={{ width: '100%' }}>
+                  <div>
+                    <label style={{ display: 'block', marginBottom: 8, fontWeight: 'bold' }}>
+                      وضعیت جدید:
+                    </label>
+                    <Select
+                      value={newStatus}
+                      onChange={setNewStatus}
+                      style={{ width: '100%' }}
+                      size="large"
+                    >
+                      <Select.Option value="Pending">در انتظار</Select.Option>
+                      <Select.Option value="Approved">تأیید شده</Select.Option>
+                      <Select.Option value="Rejected">رد شده</Select.Option>
+                      <Select.Option value="Processing">در حال پردازش</Select.Option>
+                      <Select.Option value="Completed">کامل شده</Select.Option>
+                    </Select>
+                  </div>
+
+                  <div>
+                    <label style={{ display: 'block', marginBottom: 8, fontWeight: 'bold' }}>
+                      مبلغ بازپرداختی (تومان):
+                    </label>
+                    <InputNumber
+                      value={refundAmount}
+                      onChange={setRefundAmount}
+                      style={{ width: '100%' }}
+                      size="large"
+                      min={0}
+                      formatter={(value) => `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
+                      parser={(value) => value.replace(/\$\s?|(,*)/g, '')}
+                    />
+                  </div>
+
+                  <div>
+                    <label style={{ display: 'block', marginBottom: 8, fontWeight: 'bold' }}>
+                      یادداشت ادمین (اختیاری):
+                    </label>
+                    <TextArea
+                      value={adminNotes}
+                      onChange={(e) => setAdminNotes(e.target.value)}
+                      rows={4}
+                      placeholder="یادداشت‌های داخلی برای این درخواست مرجوعی..."
+                    />
+                  </div>
+                </Space>
               </div>
-            </>
+            </Space>
           )}
         </Card>
-      </Modal>
-
-      <Modal open={createOpen} onCancel={()=>setCreateOpen(false)} onOk={createRMA} okText="ثبت RMA" confirmLoading={creating} title="ثبت RMA دستی">
-        <Form layout="vertical" form={createForm}>
-          <Form.Item name="user" label="User ID (اختیاری - فقط ادمین)" tooltip="اگر خالی بماند، RMA به نام اکانت فعلی ثبت می‌شود (ادمین).">
-            <Input />
-          </Form.Item>
-          <Form.Item name="order" label="Order ID" rules={[{ required: true, message: 'شناسه سفارش را وارد کنید' }]}>
-            <Input />
-          </Form.Item>
-          <Form.Item name="reason" label="علت بازگشت" rules={[{ required: true, message: 'علت بازگشت را وارد کنید' }]}>
-            <Input.TextArea rows={3} />
-          </Form.Item>
-          <Form.Item label="آیتم (اختیاری)">
-            <Space direction="vertical" style={{ width: '100%' }}>
-              <Input placeholder="Product ID" onChange={(e)=>{ const val = e.target.value; const items = createForm.getFieldValue('items') || []; items[0] = { ...(items[0]||{}), product: val }; createForm.setFieldsValue({ items }) }} />
-              <Input placeholder="Quantity" type="number" onChange={(e)=>{ const val = Number(e.target.value); const items = createForm.getFieldValue('items') || []; items[0] = { ...(items[0]||{}), quantity: val }; createForm.setFieldsValue({ items }) }} />
-            </Space>
-          </Form.Item>
-        </Form>
       </Modal>
     </div>
   )
 }
 
 export default RMAPage
-

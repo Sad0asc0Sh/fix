@@ -3,7 +3,7 @@ import { useAuthStore } from './stores'
 import MainLayout from './components/layout/MainLayout'
 import LoginPage from './pages/LoginPage'
 
-// صفحات - Import lazy برای بهینه‌سازی
+// Core pages
 import Dashboard from './pages/Dashboard'
 import ProductsList from './pages/products/ProductsList'
 import ProductForm from './pages/products/ProductForm'
@@ -44,9 +44,9 @@ function App() {
   return (
     <Routes>
       {/* Login */}
-      <Route 
-        path="/login" 
-        element={!isAuthenticated ? <LoginPage /> : <Navigate to="/" />} 
+      <Route
+        path="/login"
+        element={!isAuthenticated ? <LoginPage /> : <Navigate to="/" />}
       />
 
       {/* Protected Routes */}
@@ -56,50 +56,59 @@ function App() {
           isAuthenticated ? (
             <MainLayout>
               <Routes>
-                {/* داشبورد */}
+                {/* Dashboard */}
                 <Route path="/" element={<Dashboard />} />
 
-                {/* محصولات */}
+                {/* Products */}
                 <Route path="/products" element={<ProductsList />} />
+                {/* لیست محصولات متغیر (فقط productType=variable) */}
+                <Route
+                  path="/products/variable"
+                  element={<ProductsList mode="variable" />}
+                />
                 <Route path="/products/new" element={<ProductForm />} />
                 <Route path="/products/edit/:id" element={<ProductForm />} />
-                <Route path="/products/:id/variants" element={<ProductVariants />} />
+                {/* صفحه جانبی (در حال حاضر فقط اطلاع‌رسانی) برای واریانت‌ها */}
+                <Route
+                  path="/products/:id/variants"
+                  element={<ProductVariants />}
+                />
                 <Route path="/categories" element={<CategoriesPage />} />
                 <Route path="/brands" element={<BrandsPage />} />
                 <Route path="/inventory" element={<InventoryPage />} />
 
-                {/* سفارشات */}
+                {/* Orders */}
                 <Route path="/orders" element={<OrdersList />} />
                 <Route path="/orders/:id" element={<OrderDetail />} />
                 <Route path="/rma" element={<RMAPage />} />
                 <Route path="/abandoned-carts" element={<AbandonedCartsPage />} />
 
-                {/* مشتریان */}
+                {/* Customers */}
                 <Route path="/customers" element={<CustomersList />} />
                 <Route path="/customers/:id" element={<CustomerProfile />} />
 
-                {/* مالی */}
+                {/* Finance */}
                 <Route path="/coupons" element={<CouponsPage />} />
                 <Route path="/shipping" element={<ShippingPage />} />
 
-                {/* محتوا */}
+                {/* Content */}
                 <Route path="/pages" element={<PagesManagement />} />
                 <Route path="/blog/posts" element={<BlogPosts />} />
                 <Route path="/banners" element={<BannersPage />} />
 
-                {/* تیکت‌ها */}
+                {/* Tickets */}
                 <Route path="/tickets" element={<TicketsList />} />
                 <Route path="/tickets/:id" element={<TicketDetail />} />
 
-                {/* تنظیمات */}
+                {/* Settings */}
                 <Route path="/settings" element={<SettingsPage />} />
 
-                {/* گزارشات */}
+                {/* Reports */}
                 <Route path="/reports/sales" element={<SalesReports />} />
                 <Route path="/reports/products" element={<ProductsReports />} />
                 <Route path="/reports/customers" element={<CustomersReports />} />
 
-                {/* ادمین‌ها */}
+                {/* Admins */}
                 <Route path="/admins" element={<AdminsPage />} />
 
                 {/* 404 */}
@@ -116,3 +125,4 @@ function App() {
 }
 
 export default App
+

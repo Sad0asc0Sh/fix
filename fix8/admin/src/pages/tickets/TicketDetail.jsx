@@ -1,7 +1,44 @@
 import { useEffect, useRef, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { Card, Descriptions, Tag, Select, Button, Input, message } from 'antd'
+import dayjs from 'dayjs'
+import jalaliday from 'jalaliday'
 import api from '../../api'
+
+// فعال‌سازی تقویم جلالی
+dayjs.extend(jalaliday)
+dayjs.calendar('jalali')
+
+// نام ماه‌های شمسی
+const persianMonths = [
+  'فروردین',
+  'اردیبهشت',
+  'خرداد',
+  'تیر',
+  'مرداد',
+  'شهریور',
+  'مهر',
+  'آبان',
+  'آذر',
+  'دی',
+  'بهمن',
+  'اسفند',
+]
+
+// تابع برای فرمت کردن تاریخ با نام ماه فارسی
+const formatPersianDate = (date, includeTime = false) => {
+  if (!date) return '—'
+  const jalaliDate = dayjs(date).calendar('jalali').locale('fa')
+  const year = jalaliDate.format('YYYY')
+  const month = persianMonths[parseInt(jalaliDate.format('M')) - 1]
+  const day = jalaliDate.format('DD')
+
+  if (includeTime) {
+    const time = jalaliDate.format('HH:mm')
+    return `${day} ${month} ${year} - ساعت ${time}`
+  }
+  return `${day} ${month} ${year}`
+}
 
 const { TextArea } = Input
 
@@ -85,7 +122,7 @@ function TicketDetail() {
               {(ticket.messages || []).map((m, idx) => (
                 <div key={idx} style={{ marginBottom: 12 }}>
                   <div style={{ fontSize: 12, color: '#888' }}>
-                    {m.sender?.name || 'کاربر'} • {m.timestamp ? new Date(m.timestamp).toLocaleString('fa-IR') : ''}
+                    {m.sender?.name || 'کاربر'} • {formatPersianDate(m.timestamp, true)}
                   </div>
                   <div style={{ background: '#fff', border: '1px solid #eee', padding: '8px 12px', borderRadius: 8 }}>
                     {m.message}

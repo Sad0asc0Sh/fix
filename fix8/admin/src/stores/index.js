@@ -1,7 +1,9 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 
-// Auth store (persisted): holds user + JWT token
+// ========================
+// Auth store (persisted)
+// ========================
 export const useAuthStore = create(
   persist(
     (set) => ({
@@ -9,17 +11,18 @@ export const useAuthStore = create(
       token: null,
       isAuthenticated: false,
 
-      // Set authenticated user and token after successful login
-      setAuth: (user, token) => set({ user, token, isAuthenticated: Boolean(user && token) }),
+      setAuth: (user, token) =>
+        set({ user, token, isAuthenticated: Boolean(user && token) }),
 
-      // Clear session
       logout: () => set({ user: null, token: null, isAuthenticated: false }),
     }),
     { name: 'auth-storage' },
   ),
 )
 
-// Dashboard store (widget layout for drag & drop, etc.)
+// ========================
+// Dashboard store
+// ========================
 export const useDashboardStore = create((set) => ({
   widgetLayout: [
     { id: '1', title: 'Today Sales', component: 'TodaySales' },
@@ -35,7 +38,9 @@ export const useDashboardStore = create((set) => ({
   reorderWidgets: (newLayout) => set({ widgetLayout: newLayout }),
 }))
 
-// Notification store (simple demo data)
+// ========================
+// Notification store
+// ========================
 export const useNotificationStore = create((set) => ({
   notifications: [
     {
@@ -43,26 +48,56 @@ export const useNotificationStore = create((set) => ({
       type: 'order',
       title: 'New order received',
       message: 'Order #12345 was placed',
-      time: '5m ago',
+      // حدود ۵ دقیقه قبل
+      createdAt: Date.now() - 5 * 60 * 1000,
       read: false,
+      link: '/orders',
     },
     {
       id: '2',
       type: 'stock',
       title: 'Low stock alert',
       message: 'Product X stock is low',
-      time: '1h ago',
+      // حدود ۱ ساعت قبل
+      createdAt: Date.now() - 60 * 60 * 1000,
       read: false,
+      link: '/inventory',
     },
     {
       id: '3',
       type: 'ticket',
       title: 'New ticket',
       message: 'Ticket #789 was created',
-      time: '2h ago',
+      // حدود ۲ ساعت قبل
+      createdAt: Date.now() - 2 * 60 * 60 * 1000,
       read: true,
+      link: '/tickets',
     },
   ],
+
+  // افزودن نوتیفیکیشن جدید (مثلاً برای یادداشت ادمین روی سفارش)
+  addNotification: (notification) =>
+    set((state) => {
+      const id = notification.id || String(Date.now())
+      const createdAt = notification.createdAt || Date.now()
+
+      const newNotification = {
+        id,
+        read: false,
+        ...notification,
+        createdAt,
+      }
+
+      return {
+        notifications: [newNotification, ...state.notifications],
+      }
+    }),
+
+  // حذف یک نوتیفیکیشن
+  deleteNotification: (id) =>
+    set((state) => ({
+      notifications: state.notifications.filter((n) => n.id !== id),
+    })),
 
   markAsRead: (id) =>
     set((state) => ({
@@ -81,13 +116,11 @@ export const useNotificationStore = create((set) => ({
 // Category Store - Single Source of Truth
 // ============================================
 export const useCategoryStore = create((set, get) => ({
-  // State
-  categoriesTree: [], // category tree for AntD Tree/TreeSelect
-  categoriesFlat: [], // flattened list for selects
+  categoriesTree: [],
+  categoriesFlat: [],
   loading: false,
   error: null,
 
-  // Fetch categories tree from API (with children structure)
   fetchCategoriesTree: async () => {
     if (get().loading) return
 
@@ -104,7 +137,6 @@ export const useCategoryStore = create((set, get) => ({
         return null
       }
 
-      // Map backend tree to Ant Design Tree nodes and preserve icon/image info
       const toAntTree = (nodes = []) =>
         nodes.map((n) => ({
           title: n.name,
@@ -122,7 +154,6 @@ export const useCategoryStore = create((set, get) => ({
 
       const treeData = toAntTree(rawData)
 
-      // Flatten for simple selects
       const flatten = (nodes = [], parentName = '') => {
         let result = []
         nodes.forEach((n) => {
@@ -152,7 +183,7 @@ export const useCategoryStore = create((set, get) => ({
       set({
         error:
           error?.message ||
-          'خطا در دریافت لیست دسته‌بندی‌ها از سرور',
+          'خطا در دریافت لیست دسته‌بندی‌ها. لطفاً دوباره تلاش کنید.',
         loading: false,
         categoriesTree: [],
         categoriesFlat: [],
@@ -160,7 +191,45 @@ export const useCategoryStore = create((set, get) => ({
     }
   },
 
-  // Clear categories (useful for logout or reset)
   clearCategories: () => set({ categoriesTree: [], categoriesFlat: [] }),
+}))
+
+// ============================================
+// Brand Store - Single Source of Truth
+// ============================================
+export const useBrandStore = create((set, get) => ({
+  brands: [],
+  loading: false,
+  error: null,
+
+  fetchBrands: async () => {
+    if (get().loading) return
+
+    set({ loading: true, error: null })
+    try {
+      const api = (await import('../api')).default
+      const response = await api.get('/brands')
+      const rawData = response?.data?.data || []
+
+      set({
+        brands: rawData,
+        loading: false,
+      })
+      // eslint-disable-next-line no-console
+      console.log('Brands loaded successfully:', rawData.length, 'brands')
+    } catch (error) {
+      // eslint-disable-next-line no-console
+      console.error('Failed to fetch brands:', error)
+      set({
+        error:
+          error?.message ||
+          'خطا در دریافت لیست برندها. لطفاً دوباره تلاش کنید.',
+        loading: false,
+        brands: [],
+      })
+    }
+  },
+
+  clearBrands: () => set({ brands: [] }),
 }))
 

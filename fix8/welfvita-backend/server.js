@@ -69,11 +69,68 @@ app.use('/api/auth', authRoutes)
 const categoriesRoutes = require('./routes/categories')
 app.use('/api/categories', categoriesRoutes)
 
+// Brands Routes
+const brandsRoutes = require('./routes/brands')
+app.use('/api/brands', brandsRoutes)
+
 // Products Routes
 const productsRoutes = require('./routes/products')
 app.use('/api/products', productsRoutes)
 // Admin panel create endpoint: /api/v1/admin/products -> same router
 app.use('/api/v1/admin/products', productsRoutes)
+
+// Orders Routes
+const ordersRoutes = require('./routes/orders')
+app.use('/api/orders', ordersRoutes)
+
+// Shipping Routes
+const shippingRoutes = require('./routes/shipping')
+app.use('/api/shipping', shippingRoutes)
+
+// RMA Routes
+const rmaRoutes = require('./routes/rma')
+app.use('/api/rma', rmaRoutes)
+
+// Cart Routes
+const cartRoutes = require('./routes/carts')
+app.use('/api/carts', cartRoutes)
+
+// User Routes
+const userRoutes = require('./routes/users')
+app.use('/api/users', userRoutes)
+
+// Coupon Routes
+const couponRoutes = require('./routes/coupons')
+app.use('/api/coupons', couponRoutes)
+
+// Tickets Routes
+const ticketRoutes = require('./routes/tickets')
+app.use('/api/tickets', ticketRoutes)
+
+// Blog & CMS Routes
+const blogRoutes = require('./routes/blog')
+app.use('/api/blog', blogRoutes)
+const blogCategoryRoutes = require('./routes/blogCategories')
+app.use('/api/blog/categories', blogCategoryRoutes)
+const pageRoutes = require('./routes/pages')
+app.use('/api/pages', pageRoutes)
+const bannerRoutes = require('./routes/banners')
+app.use('/api/banners', bannerRoutes)
+
+// Dashboard Routes
+const dashboardRoutes = require('./routes/dashboard')
+app.use('/api/dashboard', dashboardRoutes)
+
+// Reports Routes
+const reportRoutes = require('./routes/reports')
+app.use('/api/reports', reportRoutes)
+
+// Admin Management Routes
+const adminManagementRoutes = require('./routes/adminManagement')
+app.use('/api/admin/management', adminManagementRoutes)
+// Settings Routes
+const settingsRoutes = require('./routes/settings')
+app.use('/api/settings', settingsRoutes)
 
 // Root
 app.get('/', (req, res) => {

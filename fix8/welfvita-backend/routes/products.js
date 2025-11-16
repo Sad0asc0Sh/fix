@@ -1,8 +1,14 @@
 const express = require('express')
 const router = express.Router()
+
 const Product = require('../models/Product')
+const Category = require('../models/Category')
 const { protect, authorize } = require('../middleware/auth')
 const { upload, cloudinary } = require('../middleware/upload')
+
+// ============================================
+// Helpers
+// ============================================
 
 // Normalize Cloudinary file object to { url, public_id }
 const extractImageInfo = (file) => {
@@ -11,6 +17,21 @@ const extractImageInfo = (file) => {
     url: file.path,
     public_id: file.filename,
   }
+}
+
+// Recursively collect all descendant category IDs
+const getAllDescendantCategoryIds = async (parentId) => {
+  const children = await Category.find({ parent: parentId }).select('_id').lean()
+
+  const ids = []
+
+  for (const child of children) {
+    ids.push(child._id)
+    const subIds = await getAllDescendantCategoryIds(child._id)
+    ids.push(...subIds)
+  }
+
+  return ids
 }
 
 // Helper to build filter object from query
@@ -22,10 +43,12 @@ const buildProductFilter = (query) => {
     filter.isActive = true
   }
 
+  // Text search on name
   if (query.search) {
     filter.name = { $regex: query.search, $options: 'i' }
   }
 
+  // Advanced filters like isActive[eq]=true
   Object.keys(query).forEach((key) => {
     const match = key.match(/^(.+)\[(.+)\]$/)
     if (!match) return
@@ -65,19 +88,47 @@ router.get('/', async (req, res) => {
     const sort = req.query.sort || '-createdAt'
     const fields = req.query.fields ? req.query.fields.split(',').join(' ') : undefined
 
-    const filter = buildProductFilter(req.query)
+    let filter = buildProductFilter(req.query)
 
-    const query = Product.find(filter)
-      .sort(sort)
-      .skip(skip)
-      .limit(limit)
+    // productType filter (simple / variable)
+    if (req.query.productType === 'variable') {
+      filter = {
+        ...filter,
+        productType: 'variable',
+      }
+    } else if (req.query.productType === 'simple') {
+      // برای سازگاری عقب‌رو: محصولاتی که productType ندارند هم ساده محسوب می‌شوند
+      filter = {
+        ...filter,
+        $or: [
+          { productType: { $exists: false } },
+          { productType: null },
+          { productType: '' },
+          { productType: 'simple' },
+        ],
+      }
+    }
+
+    // Category filter with optional descendants
+    if (req.query.category) {
+      if (req.query.includeChildren === 'true') {
+        const ids = [req.query.category]
+        const descendants = await getAllDescendantCategoryIds(req.query.category)
+        ids.push(...descendants)
+        filter.category = { $in: ids }
+      } else {
+        filter.category = req.query.category
+      }
+    }
+
+    const query = Product.find(filter).sort(sort).skip(skip).limit(limit)
 
     if (fields) {
       query.select(fields)
     }
 
     const [items, total] = await Promise.all([
-      query.exec(),
+      query.lean(),
       Product.countDocuments(filter),
     ])
 
@@ -130,6 +181,7 @@ router.get('/:id', async (req, res) => {
 
 // ============================================
 // POST /api/products  (JSON create)
+// Supports both simple and variable products
 // ============================================
 router.post(
   '/',
@@ -137,16 +189,41 @@ router.post(
   authorize('admin', 'manager', 'superadmin'),
   async (req, res) => {
     try {
-      const { name, price, stock, category, description, sku } = req.body
-
-      const product = await Product.create({
+      const {
         name,
         price,
         stock,
+        category,
+        brand,
+        description,
+        sku,
+        productType,
+        attributes,
+        variants,
+      } = req.body
+
+      const productData = {
+        name,
         category: category || null,
+        brand: brand || null,
         description: description || '',
         sku: sku || undefined,
-      })
+        productType: productType || 'simple',
+      }
+
+      // فیلدهای قیمت و موجودی برای محصول ساده
+      if (productType === 'simple' || !productType) {
+        if (price !== undefined) productData.price = price
+        if (stock !== undefined) productData.stock = stock
+      }
+
+      // ویژگی‌ها و متغیرها برای محصول متغیر
+      if (productType === 'variable') {
+        productData.attributes = attributes || []
+        productData.variants = variants || []
+      }
+
+      const product = await Product.create(productData)
 
       res.status(201).json({
         success: true,
@@ -166,6 +243,8 @@ router.post(
 
 // ============================================
 // PUT /api/products/:id  (update basic fields)
+// Supports optional removeAllImages flag
+// Supports both simple and variable products
 // ============================================
 router.put(
   '/:id',
@@ -177,7 +256,6 @@ router.put(
       const { removeAllImages, ...updates } = body
 
       const product = await Product.findById(req.params.id)
-
       if (!product) {
         return res.status(404).json({
           success: false,
@@ -185,10 +263,8 @@ router.put(
         })
       }
 
-      Object.assign(product, updates)
-
-      // If client requested to remove all images, delete from Cloudinary and clear array
-      if (removeAllImages === 'true' || removeAllImages === true) {
+      // Remove all images (and from Cloudinary) if requested
+      if (removeAllImages) {
         if (Array.isArray(product.images)) {
           for (const img of product.images) {
             if (img && typeof img === 'object' && img.public_id) {
@@ -206,12 +282,17 @@ router.put(
         product.images = []
       }
 
-      await product.save()
+      // Apply other updates
+      Object.keys(updates).forEach((key) => {
+        product[key] = updates[key]
+      })
+
+      const updatedProduct = await product.save()
 
       res.json({
         success: true,
         message: 'Product updated successfully',
-        data: product,
+        data: updatedProduct,
       })
     } catch (error) {
       console.error('Error updating product:', error)
@@ -313,4 +394,79 @@ router.delete(
   },
 )
 
+// ============================================
+// PUT /api/products/:id/stock - Quick stock update
+// Only for simple products
+// ============================================
+router.put(
+  '/:id/stock',
+  protect,
+  authorize('admin', 'manager', 'superadmin'),
+  async (req, res) => {
+    try {
+      const { stock } = req.body
+
+      if (stock === undefined || stock === null || stock === '') {
+        return res.status(400).json({
+          success: false,
+          message: 'مقدار موجودی معتبر نیست',
+        })
+      }
+
+      const numericStock = Number(stock)
+      if (!Number.isFinite(numericStock)) {
+        return res.status(400).json({
+          success: false,
+          message: 'مقدار موجودی معتبر نیست',
+        })
+      }
+
+      if (numericStock < 0) {
+        return res.status(400).json({
+          success: false,
+          message: 'موجودی نمی‌تواند منفی باشد',
+        })
+      }
+
+      const product = await Product.findById(req.params.id)
+      if (!product) {
+        return res.status(404).json({
+          success: false,
+          message: 'محصول یافت نشد',
+        })
+      }
+
+      // Only simple products support direct stock field
+      if (product.productType === 'variable') {
+        return res.status(400).json({
+          success: false,
+          message:
+            'مدیریت موجودی برای محصولات متغیر باید از طریق متغیرها انجام شود، نه فیلد stock اصلی محصول.',
+        })
+      }
+
+      // Update stock only, without triggering validation on other fields
+      const updated = await Product.findByIdAndUpdate(
+        req.params.id,
+        { $set: { stock: numericStock } },
+        { new: true, runValidators: false },
+      )
+
+      res.json({
+        success: true,
+        message: 'موجودی محصول با موفقیت به‌روزرسانی شد',
+        data: updated,
+      })
+    } catch (error) {
+      console.error('Error updating stock:', error)
+      res.status(500).json({
+        success: false,
+        message: 'خطا در به‌روزرسانی موجودی',
+        error: error.message,
+      })
+    }
+  },
+)
+
 module.exports = router
+

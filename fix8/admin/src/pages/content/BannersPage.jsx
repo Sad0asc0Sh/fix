@@ -1,7 +1,44 @@
 import { useEffect, useState } from 'react'
 import { Card, Table, Button, Space, Input, Select, Modal, Form, Tag, message, Popconfirm, Upload } from 'antd'
 import { InboxOutlined } from '@ant-design/icons'
+import dayjs from 'dayjs'
+import jalaliday from 'jalaliday'
 import api from '../../api'
+
+// فعال‌سازی تقویم جلالی
+dayjs.extend(jalaliday)
+dayjs.calendar('jalali')
+
+// نام ماه‌های شمسی
+const persianMonths = [
+  'فروردین',
+  'اردیبهشت',
+  'خرداد',
+  'تیر',
+  'مرداد',
+  'شهریور',
+  'مهر',
+  'آبان',
+  'آذر',
+  'دی',
+  'بهمن',
+  'اسفند',
+]
+
+// تابع برای فرمت کردن تاریخ با نام ماه فارسی
+const formatPersianDate = (date, includeTime = false) => {
+  if (!date) return '—'
+  const jalaliDate = dayjs(date).calendar('jalali').locale('fa')
+  const year = jalaliDate.format('YYYY')
+  const month = persianMonths[parseInt(jalaliDate.format('M')) - 1]
+  const day = jalaliDate.format('DD')
+
+  if (includeTime) {
+    const time = jalaliDate.format('HH:mm')
+    return `${day} ${month} ${year} - ساعت ${time}`
+  }
+  return `${day} ${month} ${year}`
+}
 
 function BannersPage() {
   const [banners, setBanners] = useState([])
@@ -41,7 +78,7 @@ function BannersPage() {
     { title: 'وضعیت', dataIndex: 'isActive', key: 'isActive', render: (v)=> <Tag color={v?'green':'red'}>{v?'فعال':'غیرفعال'}</Tag> },
     { title: 'لینک', dataIndex: 'link', key: 'link' },
     { title: 'تصویر', dataIndex: ['image','url'], key: 'image', render: (u)=> u? <a href={u} target="_blank" rel="noreferrer">مشاهده</a> : '-' },
-    { title: 'تاریخ', dataIndex: 'createdAt', key: 'createdAt', render: (d)=> d? new Date(d).toLocaleString('fa-IR') : '-' },
+    { title: 'تاریخ', dataIndex: 'createdAt', key: 'createdAt', render: (d)=> formatPersianDate(d, true) },
     { title: 'عملیات', key: 'actions', render: (_, r) => (
       <Space>
         <Button size="small" onClick={()=>onEdit(r)}>ویرایش</Button>

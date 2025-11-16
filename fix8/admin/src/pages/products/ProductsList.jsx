@@ -1,27 +1,61 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Table, Button, Input, Select, Space, Switch, Tag, Image, Modal, message } from 'antd'
-import { PlusOutlined, SearchOutlined, ExportOutlined, ImportOutlined, DeleteOutlined, EditOutlined } from '@ant-design/icons'
+import {
+  Table,
+  Button,
+  Input,
+  Select,
+  Space,
+  Switch,
+  Tag,
+  Image,
+  Modal,
+  message,
+  Checkbox,
+} from 'antd'
+import {
+  PlusOutlined,
+  SearchOutlined,
+  ExportOutlined,
+  ImportOutlined,
+  DeleteOutlined,
+  EditOutlined,
+} from '@ant-design/icons'
 import { Link } from 'react-router-dom'
 import api from '../../api'
 
-function ProductsList() {
+function ProductsList({ mode }) {
   const [products, setProducts] = useState([])
   const [loading, setLoading] = useState(false)
   const [selectedRowKeys, setSelectedRowKeys] = useState([])
-  const [filters, setFilters] = useState({ search: '', category: null, status: null })
-  const [pagination, setPagination] = useState({ current: 1, pageSize: 10, total: 0 })
+  const [filters, setFilters] = useState({
+    search: '',
+    category: null,
+    status: null,
+    productType: '',
+  })
+  const [includeChildren, setIncludeChildren] = useState(true)
+  const [pagination, setPagination] = useState({
+    current: 1,
+    pageSize: 10,
+    total: 0,
+  })
   const [categories, setCategories] = useState([])
 
   useEffect(() => {
     ;(async () => {
       try {
-        const res = await api.get('/categories', { params: { limit: 1000, fields: 'name,slug,_id' } })
+        const res = await api.get('/categories', {
+          params: { limit: 1000, fields: 'name,slug,_id' },
+        })
         setCategories(res?.data?.data || [])
       } catch (_) {}
     })()
   }, [])
 
-  const categoryOptions = useMemo(() => categories.map((c) => ({ text: c.name, value: c._id })), [categories])
+  const categoryOptions = useMemo(
+    () => categories.map((c) => ({ text: c.name, value: c._id })),
+    [categories],
+  )
 
   const fetchProducts = async (page = pagination.current, pageSize = pagination.pageSize) => {
     setLoading(true)
@@ -30,9 +64,15 @@ function ProductsList() {
       params.set('page', String(page))
       params.set('limit', String(pageSize))
       params.set('sort', '-createdAt')
-      params.set('fields', 'name,sku,price,stock,isActive,images,_id,category')
+      params.set('fields', 'name,sku,price,stock,isActive,images,_id,category,productType')
+
       if (filters.search) params.set('search', filters.search)
-      if (filters.category) params.set('category[eq]', filters.category)
+      if (filters.category) {
+        params.set('category', filters.category)
+        if (includeChildren) {
+          params.set('includeChildren', 'true')
+        }
+      }
       if (filters.status) {
         if (filters.status === 'active') {
           params.set('isActive[eq]', 'true')
@@ -40,6 +80,14 @@ function ProductsList() {
           params.set('includeInactive', 'true')
           params.set('isActive[eq]', 'false')
         }
+      }
+
+      // Product type filter (simple / variable)
+      if (mode === 'variable') {
+        // legacy route: فقط محصولات متغیر
+        params.set('productType', 'variable')
+      } else if (filters.productType) {
+        params.set('productType', filters.productType)
       }
 
       const res = await api.get('/products', { params })
@@ -54,7 +102,7 @@ function ProductsList() {
         })
       }
     } catch (err) {
-      message.error(err?.message || 'خطا در دریافت محصولات')
+      message.error(err?.message || 'خطا در دریافت لیست محصولات')
     } finally {
       setLoading(false)
     }
@@ -63,23 +111,25 @@ function ProductsList() {
   useEffect(() => {
     fetchProducts(1, pagination.pageSize)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filters.category, filters.status])
+  }, [mode, filters.category, filters.status, filters.productType, includeChildren])
 
   const handleBulkDelete = () => {
     Modal.confirm({
       title: 'حذف گروهی محصولات',
-      content: `آیا از حذف ${selectedRowKeys.length} محصول انتخاب‌شده اطمینان دارید؟`,
-      okText: 'حذف موارد انتخاب‌شده',
+      content: `آیا از حذف ${selectedRowKeys.length} محصول انتخاب شده مطمئن هستید؟ این عملیات قابل بازگشت نیست.`,
+      okText: 'حذف محصولات انتخاب‌شده',
       cancelText: 'انصراف',
       okType: 'danger',
       onOk: async () => {
         try {
-          await Promise.all(selectedRowKeys.map((id) => api.delete(`/products/${id}`)))
+          await Promise.all(
+            selectedRowKeys.map((id) => api.delete(`/products/${id}`)),
+          )
           setSelectedRowKeys([])
           fetchProducts()
-          message.success('محصولات انتخاب‌شده حذف شدند')
+          message.success('محصولات انتخاب‌شده با موفقیت حذف شدند')
         } catch (err) {
-          message.error(err?.message || 'حذف انجام نشد')
+          message.error(err?.message || 'خطا در حذف گروهی محصولات')
         }
       },
     })
@@ -89,10 +139,14 @@ function ProductsList() {
     const nextActive = !record.isActive
     try {
       await api.put(`/products/${record._id}`, { isActive: nextActive })
-      setProducts((prev) => prev.map((p) => (p._id === record._id ? { ...p, isActive: nextActive } : p)))
-      message.success('وضعیت محصول به‌روزرسانی شد')
+      setProducts((prev) =>
+        prev.map((p) =>
+          p._id === record._id ? { ...p, isActive: nextActive } : p,
+        ),
+      )
+      message.success('وضعیت محصول با موفقیت به‌روزرسانی شد')
     } catch (err) {
-      message.error(err?.message || 'خطا در تغییر وضعیت')
+      message.error(err?.message || 'خطا در تغییر وضعیت محصول')
     }
   }
 
@@ -123,6 +177,17 @@ function ProductsList() {
       dataIndex: 'name',
       key: 'name',
     },
+    // ستون نوع محصول (وقتی از صفحه اصلی محصولات استفاده می‌کنیم)
+    ...(mode
+      ? []
+      : [
+          {
+            title: 'نوع محصول',
+            dataIndex: 'productType',
+            key: 'productType',
+            render: (type) => (type === 'variable' ? 'متغیر' : 'ساده'),
+          },
+        ]),
     {
       title: 'SKU',
       dataIndex: 'sku',
@@ -132,27 +197,39 @@ function ProductsList() {
       title: 'دسته‌بندی',
       dataIndex: 'category',
       key: 'category',
-      render: (category) => categories.find((c) => c._id === category)?.name || '-',
-      filters: categoryOptions,
+      render: (category) =>
+        categories.find((c) => c._id === category)?.name || '-',
     },
     {
       title: 'قیمت',
       dataIndex: 'price',
       key: 'price',
-      render: (price) => new Intl.NumberFormat('fa-IR').format(price) + ' تومان',
+      render: (price) =>
+        price != null
+          ? `${new Intl.NumberFormat('fa-IR').format(price)} تومان`
+          : '-',
     },
     {
       title: 'موجودی',
       dataIndex: 'stock',
       key: 'stock',
-      render: (stock) => <Tag color={stock > 10 ? 'green' : stock > 0 ? 'orange' : 'red'}>{stock} عدد</Tag>,
+      render: (stock) => (
+        <Tag color={stock > 10 ? 'green' : stock > 0 ? 'orange' : 'red'}>
+          {stock} عدد
+        </Tag>
+      ),
     },
     {
       title: 'وضعیت',
       dataIndex: 'isActive',
       key: 'status',
       render: (status, record) => (
-        <Switch checked={!!status} onChange={() => handleStatusToggle(record)} checkedChildren="فعال" unCheckedChildren="غیرفعال" />
+        <Switch
+          checked={!!status}
+          onChange={() => handleStatusToggle(record)}
+          checkedChildren="فعال"
+          unCheckedChildren="غیرفعال"
+        />
       ),
     },
     {
@@ -161,7 +238,9 @@ function ProductsList() {
       render: (_, record) => (
         <Space>
           <Link to={`/products/edit/${record._id}`}>
-            <Button type="primary" size="small" icon={<EditOutlined />}>ویرایش</Button>
+            <Button type="primary" size="small" icon={<EditOutlined />}>
+              ویرایش
+            </Button>
           </Link>
           <Button
             danger
@@ -170,17 +249,18 @@ function ProductsList() {
             onClick={() => {
               Modal.confirm({
                 title: 'حذف محصول',
-                content: 'آیا از حذف این محصول اطمینان دارید؟',
+                content:
+                  'آیا از حذف این محصول مطمئن هستید؟ این عملیات قابل بازگشت نیست.',
                 okText: 'حذف',
                 cancelText: 'انصراف',
                 okType: 'danger',
                 onOk: async () => {
                   try {
                     await api.delete(`/products/${record._id}`)
-                    message.success('محصول حذف شد')
+                    message.success('محصول با موفقیت حذف شد')
                     fetchProducts()
                   } catch (err) {
-                    message.error(err?.message || 'حذف انجام نشد')
+                    message.error(err?.message || 'خطا در حذف محصول')
                   }
                 },
               })
@@ -199,30 +279,52 @@ function ProductsList() {
   }
 
   const onTableChange = (pag) => {
-    setPagination((prev) => ({ ...prev, current: pag.current, pageSize: pag.pageSize }))
+    setPagination((prev) => ({
+      ...prev,
+      current: pag.current,
+      pageSize: pag.pageSize,
+    }))
     fetchProducts(pag.current, pag.pageSize)
   }
 
   return (
     <div>
-      <div style={{ marginBottom: 16, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+      <div
+        style={{
+          marginBottom: 16,
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+        }}
+      >
         <h1>لیست محصولات</h1>
         <Space>
           <Button icon={<ImportOutlined />}>درون‌ریزی CSV</Button>
           <Button icon={<ExportOutlined />}>برون‌ریزی Excel</Button>
           <Link to="/products/new">
-            <Button type="primary" icon={<PlusOutlined />}>محصول جدید</Button>
+            <Button type="primary" icon={<PlusOutlined />}>
+              محصول جدید
+            </Button>
           </Link>
         </Space>
       </div>
 
-      <div style={{ marginBottom: 16, display: 'flex', gap: 16, flexWrap: 'wrap' }}>
+      <div
+        style={{
+          marginBottom: 16,
+          display: 'flex',
+          gap: 16,
+          flexWrap: 'wrap',
+        }}
+      >
         <Input
-          placeholder="جستجو نام یا SKU..."
+          placeholder="جستجو بر اساس نام یا SKU..."
           prefix={<SearchOutlined />}
           style={{ width: 300 }}
           allowClear
-          onChange={(e) => setFilters({ ...filters, search: e.target.value })}
+          onChange={(e) =>
+            setFilters((prev) => ({ ...prev, search: e.target.value }))
+          }
           onPressEnter={() => fetchProducts(1, pagination.pageSize)}
           onBlur={() => fetchProducts(1, pagination.pageSize)}
         />
@@ -230,28 +332,62 @@ function ProductsList() {
           placeholder="دسته‌بندی"
           style={{ width: 200 }}
           allowClear
-          onChange={(value) => setFilters({ ...filters, category: value })}
+          onChange={(value) =>
+            setFilters((prev) => ({ ...prev, category: value || null }))
+          }
         >
           {categories.map((c) => (
-            <Select.Option key={c._id} value={c._id}>{c.name}</Select.Option>
+            <Select.Option key={c._id} value={c._id}>
+              {c.name}
+            </Select.Option>
           ))}
         </Select>
+        {filters.category && (
+          <Checkbox
+            checked={includeChildren}
+            onChange={(e) => setIncludeChildren(e.target.checked)}
+          >
+            نمایش محصولات زیردسته‌ها
+          </Checkbox>
+        )}
         <Select
-          placeholder="وضعیت"
+          placeholder='وضعیت'
           style={{ width: 150 }}
           allowClear
-          onChange={(value) => setFilters({ ...filters, status: value })}
+          onChange={(value) =>
+            setFilters((prev) => ({ ...prev, status: value || null }))
+          }
         >
           <Select.Option value="active">فعال</Select.Option>
           <Select.Option value="inactive">غیرفعال</Select.Option>
         </Select>
+        <Select
+          placeholder="نوع محصول"
+          style={{ width: 180 }}
+          allowClear
+          onChange={(value) =>
+            setFilters((prev) => ({ ...prev, productType: value || '' }))
+          }
+        >
+          <Select.Option value="simple">محصول ساده</Select.Option>
+          <Select.Option value="variable">محصول متغیر</Select.Option>
+        </Select>
       </div>
 
       {selectedRowKeys.length > 0 && (
-        <div style={{ marginBottom: 16, padding: 16, background: '#e6f7ff', borderRadius: 8 }}>
+        <div
+          style={{
+            marginBottom: 16,
+            padding: 16,
+            background: '#e6f7ff',
+            borderRadius: 8,
+          }}
+        >
           <Space>
-            <span>{selectedRowKeys.length} مورد انتخاب شده</span>
-            <Button size="small" danger onClick={handleBulkDelete}>حذف</Button>
+            <span>{selectedRowKeys.length} محصول انتخاب شده است</span>
+            <Button size="small" danger onClick={handleBulkDelete}>
+              حذف گروهی
+            </Button>
           </Space>
         </div>
       )}

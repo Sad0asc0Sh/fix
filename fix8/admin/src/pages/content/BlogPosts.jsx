@@ -2,7 +2,44 @@ import { useEffect, useState } from 'react'
 import { Card, Table, Button, Space, Input, Select, Modal, Form, Tag, message, Popconfirm } from 'antd'
 import ReactQuill from 'react-quill'
 import 'react-quill/dist/quill.snow.css'
+import dayjs from 'dayjs'
+import jalaliday from 'jalaliday'
 import api from '../../api'
+
+// فعال‌سازی تقویم جلالی
+dayjs.extend(jalaliday)
+dayjs.calendar('jalali')
+
+// نام ماه‌های شمسی
+const persianMonths = [
+  'فروردین',
+  'اردیبهشت',
+  'خرداد',
+  'تیر',
+  'مرداد',
+  'شهریور',
+  'مهر',
+  'آبان',
+  'آذر',
+  'دی',
+  'بهمن',
+  'اسفند',
+]
+
+// تابع برای فرمت کردن تاریخ با نام ماه فارسی
+const formatPersianDate = (date, includeTime = false) => {
+  if (!date) return '—'
+  const jalaliDate = dayjs(date).calendar('jalali').locale('fa')
+  const year = jalaliDate.format('YYYY')
+  const month = persianMonths[parseInt(jalaliDate.format('M')) - 1]
+  const day = jalaliDate.format('DD')
+
+  if (includeTime) {
+    const time = jalaliDate.format('HH:mm')
+    return `${day} ${month} ${year} - ساعت ${time}`
+  }
+  return `${day} ${month} ${year}`
+}
 
 function BlogPosts() {
   const [posts, setPosts] = useState([])
@@ -55,7 +92,7 @@ function BlogPosts() {
     { title: 'عنوان', dataIndex: 'title', key: 'title' },
     { title: 'دسته', key: 'category', render: (_, r) => r.category?.name || '-' },
     { title: 'وضعیت', dataIndex: 'status', key: 'status', render: (s)=> <Tag color={s==='published'?'green':'orange'}>{s}</Tag> },
-    { title: 'ایجاد', dataIndex: 'createdAt', key: 'createdAt', render: (d)=> d? new Date(d).toLocaleString('fa-IR') : '-' },
+    { title: 'ایجاد', dataIndex: 'createdAt', key: 'createdAt', render: (d)=> formatPersianDate(d, true) },
     {
       title: 'عملیات', key: 'actions', render: (_, r) => (
         <Space>

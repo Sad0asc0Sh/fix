@@ -1,36 +1,67 @@
 import { useEffect, useState } from 'react'
-import { Card, Table } from 'antd'
+import { Card, Table, message } from 'antd'
 import api from '../../api'
 
 function CustomersReports() {
   const [data, setData] = useState([])
   const [loading, setLoading] = useState(false)
 
-  const fetchUsers = async () => {
+  const fetchReports = async () => {
     setLoading(true)
     try {
-      const res = await api.get('/admin/users')
+      const res = await api.get('/reports/customers')
       const list = res?.data?.data || []
-      setData(list.map((u) => ({ ...u, orders: undefined })))
-    } catch (_) {}
-    finally { setLoading(false) }
+      setData(Array.isArray(list) ? list : [])
+    } catch (err) {
+      const msg =
+        err?.response?.data?.message ||
+        err?.message ||
+        'خطا در دریافت گزارش مشتریان'
+      message.error(msg)
+    } finally {
+      setLoading(false)
+    }
   }
 
-  useEffect(() => { fetchUsers() }, [])
+  useEffect(() => {
+    fetchReports()
+  }, [])
 
   const columns = [
-    { title: 'نام', dataIndex: 'name', key: 'name' },
-    { title: 'ایمیل', dataIndex: 'email', key: 'email' },
-    { title: 'نقش', dataIndex: 'role', key: 'role' },
-    { title: 'وضعیت', dataIndex: 'isActive', key: 'isActive', render: (v)=> v ? 'فعال' : 'غیرفعال' },
-    { title: 'تاریخ ایجاد', dataIndex: 'createdAt', key: 'createdAt', render: (d)=> d ? new Date(d).toLocaleString('fa-IR') : '-' },
+    {
+      title: 'نام مشتری',
+      dataIndex: 'name',
+      key: 'name',
+    },
+    {
+      title: 'ایمیل',
+      dataIndex: 'email',
+      key: 'email',
+    },
+    {
+      title: 'تعداد سفارشات',
+      dataIndex: 'ordersCount',
+      key: 'ordersCount',
+    },
+    {
+      title: 'مجموع خرید (تومان)',
+      dataIndex: 'totalSpent',
+      key: 'totalSpent',
+      render: (val) =>
+        new Intl.NumberFormat('fa-IR').format(val || 0),
+    },
   ]
 
   return (
     <div>
       <h1>گزارش مشتریان</h1>
       <Card>
-        <Table columns={columns} dataSource={data} loading={loading} rowKey="_id" />
+        <Table
+          columns={columns}
+          dataSource={data}
+          loading={loading}
+          rowKey={(r) => r.userId || r.email}
+        />
       </Card>
     </div>
   )

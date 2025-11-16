@@ -1,6 +1,81 @@
 const mongoose = require('mongoose')
 
-// Product schema based on TECHNICAL_DOCS
+// ============================================
+// Schema برای یک متغیر محصول (Product Variant)
+// ============================================
+const variantSchema = new mongoose.Schema(
+  {
+    sku: {
+      type: String,
+      trim: true,
+    },
+
+    price: {
+      type: Number,
+      required: true,
+      min: 0,
+    },
+
+    stock: {
+      type: Number,
+      required: true,
+      min: 0,
+      default: 0,
+    },
+
+    // گزینه‌های این متغیر (مثل: [{name: 'رنگ', value: 'آبی'}, {name: 'سایز', value: 'L'}])
+    options: [
+      {
+        name: {
+          type: String,
+          required: true,
+          trim: true,
+        },
+        value: {
+          type: String,
+          required: true,
+          trim: true,
+        },
+      },
+    ],
+
+    // تصاویر اختصاصی این متغیر
+    images: [
+      {
+        url: { type: String },
+        public_id: { type: String },
+      },
+    ],
+  },
+  { _id: true },
+)
+
+// ============================================
+// Schema برای یک ویژگی محصول (Product Attribute)
+// ============================================
+const attributeSchema = new mongoose.Schema(
+  {
+    // نام ویژگی (مثلاً: 'رنگ' یا 'سایز')
+    name: {
+      type: String,
+      required: true,
+      trim: true,
+    },
+
+    // مقادیر ممکن این ویژگی (مثلاً: ['آبی', 'قرمز', 'سبز'])
+    values: [
+      {
+        type: String,
+        trim: true,
+      },
+    ],
+  },
+  { _id: false },
+)
+
+// ============================================
+// Schema اصلی محصول (Product)
+// ============================================
 const ProductSchema = new mongoose.Schema(
   {
     name: {
@@ -22,10 +97,26 @@ const ProductSchema = new mongoose.Schema(
       default: '',
     },
 
+    // ============================================
+    // نوع محصول: ساده یا متغیر
+    // ============================================
+    productType: {
+      type: String,
+      enum: ['simple', 'variable'],
+      default: 'simple',
+    },
+
+    // ============================================
+    // فیلدهای قیمت و موجودی (برای محصولات ساده)
+    // در محصولات متغیر، این مقادیر در variants تعریف می‌شوند
+    // ============================================
     price: {
       type: Number,
-      required: [true, 'Price is required'],
       min: 0,
+      // برای محصولات ساده الزامی است
+      required: function () {
+        return this.productType === 'simple'
+      },
     },
 
     compareAtPrice: {
@@ -45,12 +136,13 @@ const ProductSchema = new mongoose.Schema(
     },
 
     brand: {
-      type: String,
-      trim: true,
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Brand',
+      required: false,
     },
 
     // Images: array of objects {url, public_id} (Cloudinary)
-    // but old string paths are also accepted for backward compatibility.
+    // در محصولات متغیر، این تصاویر مشترک هستند
     images: {
       type: [mongoose.Schema.Types.Mixed],
       default: [],
@@ -60,7 +152,21 @@ const ProductSchema = new mongoose.Schema(
       type: Number,
       default: 0,
       min: 0,
+      // برای محصولات ساده الزامی است
+      required: function () {
+        return this.productType === 'simple'
+      },
     },
+
+    // ============================================
+    // ویژگی‌ها (فقط برای محصولات متغیر)
+    // ============================================
+    attributes: [attributeSchema],
+
+    // ============================================
+    // متغیرها (فقط برای محصولات متغیر)
+    // ============================================
+    variants: [variantSchema],
 
     rating: {
       type: Number,

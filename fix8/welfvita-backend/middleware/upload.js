@@ -13,10 +13,14 @@ cloudinary.config({
 const storage = new CloudinaryStorage({
   cloudinary,
   params: (req, file) => {
-    const folder =
-      file.fieldname === 'icon' || file.fieldname === 'image'
-        ? 'welfvita/categories'
-        : 'welfvita/uploads'
+    let folder = 'welfvita/uploads'
+
+    // تعیین folder بر اساس نوع فایل
+    if (file.fieldname === 'icon' || file.fieldname === 'image') {
+      folder = 'welfvita/categories'
+    } else if (file.fieldname === 'logo') {
+      folder = 'welfvita/brands'
+    }
 
     return {
       folder,

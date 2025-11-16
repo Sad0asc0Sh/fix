@@ -47,7 +47,7 @@ exports.getCategoryTree = async (req, res) => {
     console.error('Error fetching category tree:', error)
     res.status(500).json({
       success: false,
-      message: 'Failed to fetch category tree',
+      message: 'خطا در دریافت درخت دسته‌بندی‌ها',
       error: error.message,
     })
   }
@@ -87,7 +87,7 @@ exports.getAllCategories = async (req, res) => {
     console.error('Error fetching categories:', error)
     res.status(500).json({
       success: false,
-      message: 'Failed to fetch categories',
+      message: 'خطا در دریافت دسته‌بندی‌ها',
       error: error.message,
     })
   }
@@ -104,7 +104,7 @@ exports.getCategoryById = async (req, res) => {
     if (!category) {
       return res.status(404).json({
         success: false,
-        message: 'Category not found',
+        message: 'دسته‌بندی با این شناسه یافت نشد',
       })
     }
 
@@ -116,7 +116,7 @@ exports.getCategoryById = async (req, res) => {
     console.error('Error fetching category by id:', error)
     res.status(500).json({
       success: false,
-      message: 'Failed to fetch category',
+      message: 'خطا در دریافت اطلاعات دسته‌بندی',
       error: error.message,
     })
   }
@@ -130,7 +130,7 @@ exports.createCategory = async (req, res) => {
     if (!name) {
       return res.status(400).json({
         success: false,
-        message: 'Category name is required',
+        message: 'لطفاً نام دسته‌بندی را وارد کنید',
       })
     }
 
@@ -155,13 +155,13 @@ exports.createCategory = async (req, res) => {
     res.status(201).json({
       success: true,
       data: category,
-      message: 'Category created successfully',
+      message: 'دسته‌بندی با موفقیت ایجاد شد',
     })
   } catch (error) {
     console.error('Error creating category:', error)
     res.status(500).json({
       success: false,
-      message: 'Failed to create category',
+      message: 'خطا در ایجاد دسته‌بندی',
       error: error.message,
     })
   }
@@ -175,7 +175,7 @@ exports.updateCategory = async (req, res) => {
     if (!category) {
       return res.status(404).json({
         success: false,
-        message: 'Category not found',
+        message: 'دسته‌بندی با این شناسه یافت نشد',
       })
     }
 
@@ -266,13 +266,13 @@ exports.updateCategory = async (req, res) => {
     res.json({
       success: true,
       data: updatedCategory,
-      message: 'Category updated successfully',
+      message: 'دسته‌بندی با موفقیت به‌روزرسانی شد',
     })
   } catch (error) {
     console.error('Error updating category:', error)
     res.status(500).json({
       success: false,
-      message: 'Failed to update category',
+      message: 'خطا در به‌روزرسانی دسته‌بندی',
       error: error.message,
     })
   }
@@ -286,7 +286,7 @@ exports.deleteCategory = async (req, res) => {
     if (!category) {
       return res.status(404).json({
         success: false,
-        message: 'Category not found',
+        message: 'دسته‌بندی با این شناسه یافت نشد',
       })
     }
 
@@ -310,15 +310,14 @@ exports.deleteCategory = async (req, res) => {
 
     res.json({
       success: true,
-      message: 'Category deleted successfully',
+      message: 'دسته‌بندی با موفقیت حذف شد',
     })
   } catch (error) {
     console.error('Error deleting category:', error)
     res.status(500).json({
       success: false,
-      message: 'Failed to delete category',
+      message: 'خطا در حذف دسته‌بندی',
       error: error.message,
     })
   }
 }
-

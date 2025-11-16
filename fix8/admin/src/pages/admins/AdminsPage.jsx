@@ -1,38 +1,304 @@
 import { useEffect, useState } from 'react'
-import { Card, Table, Tag } from 'antd'
+import {
+  Card,
+  Table,
+  Tag,
+  Button,
+  Modal,
+  Form,
+  Input,
+  Select,
+  Switch,
+  Space,
+  Popconfirm,
+  message,
+} from 'antd'
+import { PlusOutlined, EditOutlined, DeleteOutlined } from '@ant-design/icons'
 import api from '../../api'
 
+const { Option } = Select
+
 function AdminsPage() {
-  const [users, setUsers] = useState([])
+  const [admins, setAdmins] = useState([])
   const [loading, setLoading] = useState(false)
+  const [modalOpen, setModalOpen] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const [editingAdmin, setEditingAdmin] = useState(null)
+  const [form] = Form.useForm()
+
+  const fetchAdmins = async () => {
+    setLoading(true)
+    try {
+      const res = await api.get('/admin/management')
+      const data = res?.data?.data || []
+      setAdmins(Array.isArray(data) ? data : [])
+    } catch (err) {
+      const msg =
+        err?.response?.data?.message ||
+        err?.message ||
+        'خطا در دریافت لیست ادمین‌ها'
+      message.error(msg)
+    } finally {
+      setLoading(false)
+    }
+  }
 
   useEffect(() => {
-    (async () => {
-      setLoading(true)
-      try {
-        const res = await api.get('/admin/users')
-        setUsers((res?.data?.data || []).filter((u) => u.role === 'admin'))
-      } catch (_) {}
-      finally { setLoading(false) }
-    })()
+    fetchAdmins()
   }, [])
+
+  const openCreateModal = () => {
+    setEditingAdmin(null)
+    form.resetFields()
+    form.setFieldsValue({
+      role: 'admin',
+      isActive: true,
+    })
+    setModalOpen(true)
+  }
+
+  const openEditModal = (admin) => {
+    setEditingAdmin(admin)
+    form.resetFields()
+    form.setFieldsValue({
+      name: admin.name,
+      email: admin.email,
+      role: admin.role,
+      isActive: admin.isActive,
+    })
+    setModalOpen(true)
+  }
+
+  const handleSubmit = async () => {
+    try {
+      const values = await form.validateFields()
+
+      const payload = {
+        name: values.name,
+        email: values.email,
+        role: values.role,
+        isActive: values.isActive,
+      }
+
+      // رمز عبور فقط برای ایجاد
+      if (!editingAdmin) {
+        payload.password = values.password
+      }
+
+      setSaving(true)
+
+      if (editingAdmin) {
+        await api.put(`/admin/management/${editingAdmin._id}`, payload)
+        message.success('اطلاعات ادمین با موفقیت به‌روزرسانی شد.')
+      } else {
+        await api.post('/admin/management', payload)
+        message.success('ادمین جدید با موفقیت ایجاد شد.')
+      }
+
+      setModalOpen(false)
+      setEditingAdmin(null)
+      form.resetFields()
+      fetchAdmins()
+    } catch (err) {
+      if (err?.errorFields) {
+        return
+      }
+
+      const msg =
+        err?.response?.data?.message ||
+        err?.message ||
+        (editingAdmin
+          ? 'خطا در به‌روزرسانی اطلاعات ادمین'
+          : 'خطا در ایجاد ادمین جدید')
+      message.error(msg)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const handleDelete = async (admin) => {
+    try {
+      await api.delete(`/admin/management/${admin._id}`)
+      message.success('ادمین با موفقیت حذف شد.')
+      fetchAdmins()
+    } catch (err) {
+      const msg =
+        err?.response?.data?.message ||
+        err?.message ||
+        'خطا در حذف ادمین'
+      message.error(msg)
+    }
+  }
+
+  const renderRoleTag = (role) => {
+    let color = 'blue'
+    let label = role
+
+    if (role === 'superadmin') {
+      color = 'magenta'
+      label = 'Owner'
+    } else if (role === 'admin') {
+      color = 'geekblue'
+      label = 'Admin'
+    } else if (role === 'manager') {
+      color = 'green'
+      label = 'Manager'
+    }
+
+    return <Tag color={color}>{label}</Tag>
+  }
 
   const columns = [
     { title: 'نام', dataIndex: 'name', key: 'name' },
     { title: 'ایمیل', dataIndex: 'email', key: 'email' },
-    { title: 'نقش', dataIndex: 'role', key: 'role', render: (r) => <Tag>{r}</Tag> },
-    { title: 'وضعیت', dataIndex: 'isActive', key: 'isActive', render: (v) => <Tag color={v?'green':'red'}>{v?'فعال':'غیرفعال'}</Tag> },
+    {
+      title: 'نقش',
+      dataIndex: 'role',
+      key: 'role',
+      render: renderRoleTag,
+    },
+    {
+      title: 'وضعیت',
+      dataIndex: 'isActive',
+      key: 'isActive',
+      render: (v) => (
+        <Tag color={v ? 'green' : 'red'}>
+          {v ? 'فعال' : 'غیرفعال'}
+        </Tag>
+      ),
+    },
+    {
+      title: 'عملیات',
+      key: 'actions',
+      render: (_, record) => (
+        <Space>
+          <Button
+            size="small"
+            icon={<EditOutlined />}
+            onClick={() => openEditModal(record)}
+          >
+            ویرایش
+          </Button>
+          <Popconfirm
+            title="حذف ادمین"
+            description="آیا از حذف این ادمین مطمئن هستید؟"
+            okText="حذف"
+            cancelText="انصراف"
+            onConfirm={() => handleDelete(record)}
+          >
+            <Button
+              size="small"
+              danger
+              icon={<DeleteOutlined />}
+            >
+              حذف
+            </Button>
+          </Popconfirm>
+        </Space>
+      ),
+    },
   ]
 
   return (
     <div>
-      <h1>ادمین‌ها</h1>
+      <div
+        style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          marginBottom: 16,
+        }}
+      >
+        <h1>مدیریت ادمین‌ها</h1>
+        <Button
+          type="primary"
+          icon={<PlusOutlined />}
+          onClick={openCreateModal}
+        >
+          ایجاد ادمین جدید
+        </Button>
+      </div>
+
       <Card>
-        <Table columns={columns} dataSource={users} loading={loading} rowKey="_id" />
+        <Table
+          columns={columns}
+          dataSource={admins}
+          loading={loading}
+          rowKey="_id"
+        />
       </Card>
+
+      <Modal
+        open={modalOpen}
+        onCancel={() => {
+          setModalOpen(false)
+          setEditingAdmin(null)
+          form.resetFields()
+        }}
+        onOk={handleSubmit}
+        confirmLoading={saving}
+        title={editingAdmin ? 'ویرایش ادمین' : 'ایجاد ادمین جدید'}
+        okText="ذخیره"
+        cancelText="انصراف"
+      >
+        <Form layout="vertical" form={form}>
+          <Form.Item
+            name="name"
+            label="نام"
+            rules={[{ required: true, message: 'لطفاً نام را وارد کنید.' }]}
+          >
+            <Input placeholder="مثلاً: مدیر سیستم" />
+          </Form.Item>
+
+          <Form.Item
+            name="email"
+            label="ایمیل"
+            rules={[
+              { required: true, message: 'لطفاً ایمیل را وارد کنید.' },
+              { type: 'email', message: 'ایمیل وارد شده معتبر نیست.' },
+            ]}
+          >
+            <Input placeholder="admin@example.com" />
+          </Form.Item>
+
+          {!editingAdmin && (
+            <Form.Item
+              name="password"
+              label="رمز عبور"
+              rules={[
+                { required: true, message: 'لطفاً رمز عبور را وارد کنید.' },
+                {
+                  min: 6,
+                  message: 'رمز عبور باید حداقل ۶ کاراکتر باشد.',
+                },
+              ]}
+            >
+              <Input.Password placeholder="******" />
+            </Form.Item>
+          )}
+
+          <Form.Item
+            name="role"
+            label="نقش"
+            rules={[{ required: true, message: 'لطفاً نقش را انتخاب کنید.' }]}
+          >
+            <Select>
+              <Option value="admin">Admin</Option>
+              <Option value="manager">Manager</Option>
+            </Select>
+          </Form.Item>
+
+          <Form.Item
+            name="isActive"
+            label="وضعیت"
+            valuePropName="checked"
+          >
+            <Switch checkedChildren="فعال" unCheckedChildren="غیرفعال" />
+          </Form.Item>
+        </Form>
+      </Modal>
     </div>
   )
 }
 
 export default AdminsPage
-
