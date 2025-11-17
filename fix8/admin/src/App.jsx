@@ -73,7 +73,7 @@ const LoadingFallback = () => (
 )
 
 function App() {
-  const { isAuthenticated } = useAuthStore()
+  const { isAuthenticated, user } = useAuthStore()
 
   return (
     <Routes>
@@ -156,7 +156,14 @@ function App() {
                 <Route path="/tickets/:id" element={<TicketDetail />} />
 
                 {/* Settings */}
-                <Route path="/settings" element={<SettingsPage />} />
+                <Route
+                  path="/settings"
+                  element={
+                    user?.role === 'manager' || user?.role === 'superadmin'
+                      ? <SettingsPage />
+                      : <Navigate to="/" />
+                  }
+                />
 
                 {/* Reports */}
                 <Route path="/reports/sales" element={<SalesReports />} />
@@ -164,7 +171,12 @@ function App() {
                 <Route path="/reports/customers" element={<CustomersReports />} />
 
                 {/* Admins */}
-                <Route path="/admins" element={<AdminsPage />} />
+                <Route
+                  path="/admins"
+                  element={
+                    user?.role === 'superadmin' ? <AdminsPage /> : <Navigate to="/" />
+                  }
+                />
 
                 {/* 404 */}
                 <Route path="*" element={<Navigate to="/" />} />
@@ -181,4 +193,3 @@ function App() {
 }
 
 export default App
-

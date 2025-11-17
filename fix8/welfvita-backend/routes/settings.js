@@ -4,10 +4,9 @@ const { getSettings, updateSettings } = require('../controllers/settingsControll
 const { protect, authorize } = require('../middleware/auth')
 
 // Get current settings
-router.get('/', protect, authorize('admin', 'manager', 'superadmin'), getSettings)
+router.get('/', protect, authorize('manager', 'superadmin'), getSettings)
 
 // Update settings
-router.put('/', protect, authorize('admin', 'manager', 'superadmin'), updateSettings)
+router.put('/', protect, authorize('manager', 'superadmin'), updateSettings)
 
 module.exports = router
-

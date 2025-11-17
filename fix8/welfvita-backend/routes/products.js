@@ -311,15 +311,35 @@ router.put(
             }
           }
         }
-        product.images = []
+        updates.images = []
       }
 
-      // Apply other updates
-      Object.keys(updates).forEach((key) => {
-        product[key] = updates[key]
-      })
+      // Clean up invalid ObjectId references before updating
+      // If brand or category is not a valid ObjectId, remove it from updates
+      if (updates.brand !== undefined) {
+        const mongoose = require('mongoose')
+        if (updates.brand === null || updates.brand === '') {
+          updates.brand = null
+        } else if (typeof updates.brand === 'string' && !mongoose.Types.ObjectId.isValid(updates.brand)) {
+          delete updates.brand
+        }
+      }
 
-      const updatedProduct = await product.save()
+      if (updates.category !== undefined) {
+        const mongoose = require('mongoose')
+        if (updates.category === null || updates.category === '') {
+          updates.category = null
+        } else if (typeof updates.category === 'string' && !mongoose.Types.ObjectId.isValid(updates.category)) {
+          delete updates.category
+        }
+      }
+
+      // Use findByIdAndUpdate for simple updates to avoid full validation
+      const updatedProduct = await Product.findByIdAndUpdate(
+        req.params.id,
+        { $set: updates },
+        { new: true, runValidators: false }
+      )
 
       res.json({
         success: true,

@@ -14,11 +14,10 @@ const { protect, authorize } = require('../middleware/auth')
 router.get('/', getAllMethods)
 
 // روت‌های ادمین (محافظت شده)
-router.post('/', protect, authorize('admin', 'manager', 'superadmin'), createMethod)
-router.get('/admin', protect, authorize('admin', 'manager', 'superadmin'), getAllMethods)
-router.get('/:id', protect, authorize('admin', 'manager', 'superadmin'), getMethodById)
-router.put('/:id', protect, authorize('admin', 'manager', 'superadmin'), updateMethod)
-router.delete('/:id', protect, authorize('admin', 'manager', 'superadmin'), deleteMethod)
+router.post('/', protect, authorize('manager', 'superadmin'), createMethod)
+router.get('/admin', protect, authorize('manager', 'superadmin'), getAllMethods)
+router.get('/:id', protect, authorize('manager', 'superadmin'), getMethodById)
+router.put('/:id', protect, authorize('manager', 'superadmin'), updateMethod)
+router.delete('/:id', protect, authorize('manager', 'superadmin'), deleteMethod)
 
 module.exports = router
-

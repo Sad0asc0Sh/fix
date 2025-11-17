@@ -11,8 +11,11 @@ import {
   Switch,
   Rate,
   Typography,
+  Form,
+  Input,
+  Divider,
 } from 'antd'
-import { ReloadOutlined, DeleteOutlined } from '@ant-design/icons'
+import { ReloadOutlined, DeleteOutlined, SendOutlined } from '@ant-design/icons'
 import dayjs from 'dayjs'
 import jalaliday from 'jalaliday'
 import api from '../../api'
@@ -37,6 +40,8 @@ const formatPersianDate = (date, includeTime = false) => {
 function ReviewsPage() {
   const [reviews, setReviews] = useState([])
   const [loading, setLoading] = useState(false)
+  const [replyLoading, setReplyLoading] = useState({}) // برای نمایش loading در هر ردیف
+  const [replyTexts, setReplyTexts] = useState({}) // برای نگهداری متن پاسخ هر نظر
   const [filters, setFilters] = useState({
     isApproved: null,
   })
@@ -45,6 +50,7 @@ function ReviewsPage() {
     pageSize: 20,
     total: 0,
   })
+  const [form] = Form.useForm()
 
   const fetchReviews = async (page = pagination.current, pageSize = pagination.pageSize) => {
     setLoading(true)
@@ -81,6 +87,17 @@ function ReviewsPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filters.isApproved])
 
+  // Initialize reply texts when reviews are loaded
+  useEffect(() => {
+    const initialTexts = {}
+    reviews.forEach((review) => {
+      if (review.adminReply?.message) {
+        initialTexts[review._id] = review.adminReply.message
+      }
+    })
+    setReplyTexts(initialTexts)
+  }, [reviews])
+
   const handleStatusToggle = async (reviewId, currentStatus) => {
     try {
       await api.put(`/reviews/${reviewId}/status`, {
@@ -102,6 +119,32 @@ function ReviewsPage() {
     } catch (err) {
       message.error('خطا در حذف نظر')
     }
+  }
+
+  const handleReply = async (reviewId) => {
+    const replyMessage = replyTexts[reviewId] || ''
+
+    if (!replyMessage || replyMessage.trim() === '') {
+      message.warning('لطفاً متن پاسخ را وارد کنید')
+      return
+    }
+
+    setReplyLoading((prev) => ({ ...prev, [reviewId]: true }))
+    try {
+      await api.put(`/reviews/${reviewId}/reply`, {
+        replyMessage: replyMessage.trim(),
+      })
+      message.success('پاسخ شما با موفقیت ثبت شد')
+      fetchReviews()
+    } catch (err) {
+      message.error('خطا در ثبت پاسخ')
+    } finally {
+      setReplyLoading((prev) => ({ ...prev, [reviewId]: false }))
+    }
+  }
+
+  const handleReplyTextChange = (reviewId, text) => {
+    setReplyTexts((prev) => ({ ...prev, [reviewId]: text }))
   }
 
   const columns = [
@@ -246,11 +289,66 @@ function ReviewsPage() {
           }}
           expandable={{
             expandedRowRender: (record) => (
-              <Typography.Paragraph
-                style={{ margin: 0, padding: '0 24px' }}
-              >
-                {record.comment}
-              </Typography.Paragraph>
+              <div style={{ padding: '16px 24px' }}>
+                {/* ۱. نمایش نظر کاربر */}
+                <Typography.Title level={5}>نظر کاربر:</Typography.Title>
+                <Typography.Paragraph style={{ marginBottom: 16 }}>
+                  {record.comment}
+                </Typography.Paragraph>
+
+                {/* ۲. نمایش پاسخ قبلی ادمین (اگر وجود داشت) */}
+                {record.adminReply && record.adminReply.message && (
+                  <>
+                    <Divider style={{ margin: '16px 0' }} />
+                    <Typography.Title level={5} style={{ color: '#1890ff' }}>
+                      پاسخ شما:
+                    </Typography.Title>
+                    <Typography.Paragraph
+                      style={{
+                        fontStyle: 'italic',
+                        background: '#f0f5ff',
+                        padding: '12px',
+                        borderRadius: '4px',
+                        marginBottom: 16,
+                      }}
+                    >
+                      {record.adminReply.message}
+                    </Typography.Paragraph>
+                    {record.adminReply.repliedAt && (
+                      <Typography.Text type="secondary" style={{ fontSize: '0.85em' }}>
+                        تاریخ پاسخ: {formatPersianDate(record.adminReply.repliedAt, true)}
+                      </Typography.Text>
+                    )}
+                  </>
+                )}
+
+                {/* ۳. فرم ارسال/ویرایش پاسخ جدید */}
+                <Divider style={{ margin: '16px 0' }} />
+                <Typography.Title level={5}>ثبت/ویرایش پاسخ:</Typography.Title>
+                <Form
+                  layout="vertical"
+                  onFinish={() => handleReply(record._id)}
+                >
+                  <Form.Item label="متن پاسخ">
+                    <Input.TextArea
+                      rows={4}
+                      value={replyTexts[record._id] || ''}
+                      onChange={(e) => handleReplyTextChange(record._id, e.target.value)}
+                      placeholder="پاسخ خود را اینجا بنویسید..."
+                    />
+                  </Form.Item>
+                  <Form.Item>
+                    <Button
+                      type="primary"
+                      htmlType="submit"
+                      icon={<SendOutlined />}
+                      loading={replyLoading[record._id]}
+                    >
+                      ارسال پاسخ
+                    </Button>
+                  </Form.Item>
+                </Form>
+              </div>
             ),
           }}
         />

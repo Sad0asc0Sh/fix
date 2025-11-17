@@ -32,6 +32,15 @@ const reviewSchema = new mongoose.Schema(
       default: false,
       index: true,
     },
+    adminReply: {
+      message: {
+        type: String,
+        trim: true,
+      },
+      repliedAt: {
+        type: Date,
+      },
+    },
   },
   { timestamps: true }
 )

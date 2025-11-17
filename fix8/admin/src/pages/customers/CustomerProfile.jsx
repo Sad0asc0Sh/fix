@@ -56,11 +56,8 @@ function CustomerProfile() {
   const [form] = Form.useForm()
 
   const currentRole = useAuthStore((state) => state.user?.role || 'user')
-  const currentLevelIndex = ROLE_ORDER.indexOf(currentRole)
   const selectableRoles =
-    currentLevelIndex === -1
-      ? ['user']
-      : ROLE_ORDER.filter((_, index) => index <= currentLevelIndex)
+    currentRole === 'superadmin' ? ROLE_ORDER : ['user']
 
   const fetchUser = async () => {
     setLoading(true)
@@ -364,4 +361,3 @@ function CustomerProfile() {
 }
 
 export default CustomerProfile
-

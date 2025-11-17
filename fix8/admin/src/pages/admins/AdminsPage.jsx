@@ -136,7 +136,7 @@ function AdminsPage() {
 
     if (role === 'superadmin') {
       color = 'magenta'
-      label = 'Owner'
+      label = 'superadmin'
     } else if (role === 'admin') {
       color = 'geekblue'
       label = 'Admin'

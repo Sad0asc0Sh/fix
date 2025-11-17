@@ -207,7 +207,7 @@ router.post('/register', async (req, res) => {
       name,
       email,
       password,
-      role: role || 'user',
+      role: 'user',
     })
 
     const token = generateToken(admin._id)

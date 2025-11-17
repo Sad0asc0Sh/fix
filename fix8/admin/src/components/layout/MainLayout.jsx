@@ -34,6 +34,9 @@ function MainLayout({ children }) {
   const { notifications, markAllAsRead, deleteNotification } = useNotificationStore()
 
   const unreadCount = notifications.filter((n) => !n.read).length
+  const role = user?.role || 'user'
+  const isManagerOrSuperAdmin = role === 'manager' || role === 'superadmin'
+  const isSuperAdmin = role === 'superadmin'
 
   const menuItems = [
     {

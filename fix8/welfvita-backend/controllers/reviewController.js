@@ -140,3 +140,51 @@ exports.deleteReview = async (req, res) => {
     })
   }
 }
+
+/**
+ * @desc    ثبت/ویرایش پاسخ ادمین به نظر
+ * @route   PUT /api/reviews/:id/reply
+ * @access  Private/Admin
+ */
+exports.postAdminReply = async (req, res) => {
+  try {
+    const { id } = req.params
+    const { replyMessage } = req.body
+
+    if (!replyMessage || replyMessage.trim() === '') {
+      return res.status(400).json({
+        success: false,
+        message: 'متن پاسخ الزامی است',
+      })
+    }
+
+    const review = await Review.findById(id)
+    if (!review) {
+      return res.status(404).json({
+        success: false,
+        message: 'نظر یافت نشد',
+      })
+    }
+
+    // به‌روزرسانی پاسخ ادمین
+    review.adminReply = {
+      message: replyMessage.trim(),
+      repliedAt: Date.now(),
+    }
+
+    await review.save()
+
+    res.status(200).json({
+      success: true,
+      message: 'پاسخ شما با موفقیت ثبت شد',
+      data: review,
+    })
+  } catch (error) {
+    console.error('Error posting admin reply:', error)
+    res.status(500).json({
+      success: false,
+      message: 'خطا در ثبت پاسخ',
+      error: error.message,
+    })
+  }
+}

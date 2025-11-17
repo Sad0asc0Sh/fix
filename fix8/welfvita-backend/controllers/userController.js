@@ -1,6 +1,6 @@
 const User = require('../models/Admin')
 
-// سطح دسترسی نقش‌ها برای کنترل ارتقای نقش
+// Role hierarchy used for safety checks
 const ROLE_LEVELS = {
   user: 1,
   manager: 2,
@@ -10,7 +10,7 @@ const ROLE_LEVELS = {
 
 // ============================================
 // GET /api/users/admin/all
-// لیست کاربران (با فیلتر نقش و وضعیت) برای مدیریت توسط ادمین‌ها
+// List users (primarily customers) with filters & pagination
 // ============================================
 exports.getAllUsersAsAdmin = async (req, res) => {
   try {
@@ -28,7 +28,9 @@ exports.getAllUsersAsAdmin = async (req, res) => {
       ]
     }
 
-    if (req.query.role) {
+    // By default, this endpoint is used for customers (role = user)
+    const allowedRoles = ['user', 'admin', 'manager', 'superadmin']
+    if (req.query.role && allowedRoles.includes(req.query.role)) {
       filter.role = req.query.role
     } else {
       filter.role = 'user'
@@ -68,7 +70,7 @@ exports.getAllUsersAsAdmin = async (req, res) => {
 
 // ============================================
 // GET /api/users/admin/:id
-// دریافت مشخصات یک کاربر برای مشاهده/ویرایش توسط ادمین
+// Get single user by id
 // ============================================
 exports.getUserByIdAsAdmin = async (req, res) => {
   try {
@@ -77,7 +79,7 @@ exports.getUserByIdAsAdmin = async (req, res) => {
     if (!user) {
       return res.status(404).json({
         success: false,
-        message: 'کاربری با این شناسه یافت نشد.',
+        message: 'کاربر مورد نظر یافت نشد',
       })
     }
 
@@ -89,7 +91,7 @@ exports.getUserByIdAsAdmin = async (req, res) => {
     console.error('Error fetching user by id:', error)
     res.status(500).json({
       success: false,
-      message: 'خطا در دریافت اطلاعات کاربر',
+      message: 'خطا در دریافت جزئیات کاربر',
       error: error.message,
     })
   }
@@ -97,7 +99,8 @@ exports.getUserByIdAsAdmin = async (req, res) => {
 
 // ============================================
 // PUT /api/users/admin/:id
-// به‌روزرسانی کاربر؛ هر نقش فقط می‌تواند نقش‌های پایین‌تر را تغییر دهد
+// Update user profile (primarily customers)
+// Only superadmin can change roles; other admins can edit customer info only.
 // ============================================
 exports.updateUserAsAdmin = async (req, res) => {
   try {
@@ -105,41 +108,61 @@ exports.updateUserAsAdmin = async (req, res) => {
 
     const currentRole = req.user?.role || 'user'
     const currentLevel = ROLE_LEVELS[currentRole] || 0
+    const isSuperAdmin = currentRole === 'superadmin'
 
     const user = await User.findById(req.params.id)
 
     if (!user) {
       return res.status(404).json({
         success: false,
-        message: 'کاربری با این شناسه یافت نشد.',
+        message: 'کاربر مورد نظر یافت نشد',
       })
     }
 
     const targetCurrentLevel = ROLE_LEVELS[user.role] || 0
 
-    // هر نقش فقط می‌تواند تنظیمات نقش‌های پایین‌تر از خودش را تغییر دهد
-    if (targetCurrentLevel >= currentLevel) {
+    // For non-superadmin, this endpoint is only for regular customers (role = user)
+    if (!isSuperAdmin && user.role !== 'user') {
       return res.status(403).json({
         success: false,
-        message: 'شما مجاز به تغییر نقش این کاربر نیستید.',
+        message:
+          'فقط superadmin می‌تواند اطلاعات ادمین‌ها و مدیران را ویرایش کند.',
       })
     }
 
-    // اگر نقش جدید ارسال شده، سطح آن نباید بالاتر از نقش فعلی درخواست‌کننده باشد
+    // Never allow editing someone with higher role level
+    if (targetCurrentLevel > currentLevel) {
+      return res.status(403).json({
+        success: false,
+        message: 'اجازه ویرایش کاربری با سطح دسترسی بالاتر را ندارید.',
+      })
+    }
+
+    // Role change rules
     if (role !== undefined) {
       const newRoleLevel = ROLE_LEVELS[role]
 
       if (!newRoleLevel) {
         return res.status(400).json({
           success: false,
-          message: 'نقش انتخاب‌شده نامعتبر است.',
+          message: 'نقش ارسال‌شده معتبر نیست.',
         })
       }
 
-      if (newRoleLevel > currentLevel) {
+      // Non-superadmin cannot change role at all (even از user به admin/manager)
+      if (!isSuperAdmin && role !== user.role) {
         return res.status(403).json({
           success: false,
-          message: 'شما مجاز به انتساب این نقش نیستید.',
+          message:
+            'فقط superadmin می‌تواند نقش کاربران را به admin/manager/superadmin تغییر دهد.',
+        })
+      }
+
+      // Superadmin cannot promote someone above their own level (theoretically)
+      if (isSuperAdmin && newRoleLevel > currentLevel) {
+        return res.status(403).json({
+          success: false,
+          message: 'امکان ارتقای نقش به سطحی بالاتر از superadmin وجود ندارد.',
         })
       }
 
@@ -180,7 +203,7 @@ exports.updateUserAsAdmin = async (req, res) => {
 
 // ============================================
 // DELETE /api/users/admin/:id
-// حذف کاربر (جلوگیری از حذف خود)
+// Delete user (admin-only route guarded at router level)
 // ============================================
 exports.deleteUserAsAdmin = async (req, res) => {
   try {
@@ -189,15 +212,15 @@ exports.deleteUserAsAdmin = async (req, res) => {
     if (!user) {
       return res.status(404).json({
         success: false,
-        message: 'کاربری با این شناسه یافت نشد.',
+        message: 'کاربر مورد نظر یافت نشد',
       })
     }
 
-    // جلوگیری از حذف حساب کاربری خودِ ادمین
+    // Prevent deleting yourself
     if (user._id.toString() === req.user._id.toString()) {
       return res.status(400).json({
         success: false,
-        message: 'امکان حذف حساب کاربری خودتان وجود ندارد.',
+        message: 'نمی‌توانید حساب کاربری خودتان را حذف کنید.',
       })
     }
 

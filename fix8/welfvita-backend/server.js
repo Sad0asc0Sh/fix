@@ -11,9 +11,18 @@ const app = express()
 // ============================================
 
 // CORS
+const allowedOriginsEnv = process.env.CLIENT_URL || process.env.FRONTEND_URL
+const allowedOrigins = allowedOriginsEnv
+  ? allowedOriginsEnv.split(',').map(origin => origin.trim()).filter(Boolean)
+  : [
+      'http://localhost:5173',
+      'http://localhost:3000',
+      'http://localhost:3001',
+    ]
+
 app.use(cors({
-  origin: process.env.FRONTEND_URL || 'http://localhost:3000',
-  credentials: true
+  origin: allowedOrigins,
+  credentials: true,
 }))
 
 // Body Parser
