@@ -20,6 +20,8 @@ const storage = new CloudinaryStorage({
       folder = 'welfvita/categories'
     } else if (file.fieldname === 'logo') {
       folder = 'welfvita/brands'
+    } else if (file.fieldname === 'avatar') {
+      folder = 'welfvita/avatars'
     }
 
     return {

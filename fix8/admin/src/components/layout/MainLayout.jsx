@@ -20,6 +20,7 @@ import {
   useAuthStore,
   useNotificationStore,
 } from '../../stores'
+import ProfileModal from './ProfileModal'
 import './MainLayout.css'
 
 const { Header, Sider, Content } = Layout
@@ -27,6 +28,7 @@ const { Header, Sider, Content } = Layout
 function MainLayout({ children }) {
   const [collapsed, setCollapsed] = useState(false)
   const [mobileDrawerOpen, setMobileDrawerOpen] = useState(false)
+  const [profileModalOpen, setProfileModalOpen] = useState(false)
   const location = useLocation()
   const { user, logout } = useAuthStore()
   const { notifications, markAllAsRead, deleteNotification } = useNotificationStore()
@@ -128,6 +130,10 @@ function MainLayout({ children }) {
         {
           key: '/banners',
           label: <Link to="/banners">بنرها</Link>,
+        },
+        {
+          key: '/announcements',
+          label: <Link to="/announcements">اعلانات سایت</Link>,
         },
       ],
     },
@@ -244,6 +250,14 @@ function MainLayout({ children }) {
       ]),
   }
 
+  const handleUserMenuClick = ({ key }) => {
+    if (key === 'profile') {
+      setProfileModalOpen(true)
+    } else if (key === 'logout') {
+      logout()
+    }
+  }
+
   const userMenu = {
     items: [
       {
@@ -261,9 +275,9 @@ function MainLayout({ children }) {
         key: 'logout',
         icon: <LogoutOutlined />,
         label: 'خروج',
-        onClick: logout,
       },
     ],
+    onClick: handleUserMenuClick,
   }
 
   return (
@@ -332,7 +346,11 @@ function MainLayout({ children }) {
                   marginRight: 16,
                 }}
               >
-                <Avatar icon={<UserOutlined />} style={{ marginLeft: 8 }} />
+                <Avatar
+                  src={user?.avatar?.url}
+                  icon={!user?.avatar?.url && <UserOutlined />}
+                  style={{ marginLeft: 8 }}
+                />
                 <span>{user?.name}</span>
               </div>
             </Dropdown>
@@ -341,6 +359,12 @@ function MainLayout({ children }) {
 
         <Content className="site-content">{children}</Content>
       </Layout>
+
+      {/* Profile Modal */}
+      <ProfileModal
+        open={profileModalOpen}
+        onClose={() => setProfileModalOpen(false)}
+      />
     </Layout>
   )
 }

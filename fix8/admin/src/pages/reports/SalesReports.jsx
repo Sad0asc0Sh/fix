@@ -9,9 +9,48 @@ import {
   Tooltip,
   ResponsiveContainer,
 } from 'recharts'
+import dayjs from 'dayjs'
+import jalaliday from 'jalaliday'
 import api from '../../api'
 
 const { RangePicker } = DatePicker
+
+dayjs.extend(jalaliday)
+dayjs.calendar('jalali')
+
+const persianMonths = [
+  'فروردین',
+  'اردیبهشت',
+  'خرداد',
+  'تیر',
+  'مرداد',
+  'شهریور',
+  'مهر',
+  'آبان',
+  'آذر',
+  'دی',
+  'بهمن',
+  'اسفند',
+]
+
+const formatPersianDate = (value, granularity = 'day') => {
+  if (!value) return '-'
+
+  const baseDate = dayjs(value)
+  if (!baseDate.isValid()) return '-'
+
+  const jalaliDate = baseDate.calendar('jalali').locale('fa')
+  const year = jalaliDate.format('YYYY')
+  const monthIndex = parseInt(jalaliDate.format('M'), 10) - 1
+  const month = persianMonths[monthIndex] || jalaliDate.format('MM')
+
+  if (granularity === 'month') {
+    return `${month} ${year}`
+  }
+
+  const day = jalaliDate.format('DD')
+  return `${day} ${month} ${year}`
+}
 
 function SalesReports() {
   const [loading, setLoading] = useState(false)
@@ -21,6 +60,7 @@ function SalesReports() {
     ordersCount: 0,
   })
   const [series, setSeries] = useState([])
+  const [granularity, setGranularity] = useState('day')
 
   const fetchReports = async (params = {}) => {
     setLoading(true)
@@ -33,6 +73,7 @@ function SalesReports() {
         ordersCount: data.summary?.ordersCount || 0,
       })
       setSeries(Array.isArray(data.series) ? data.series : [])
+      setGranularity(data.granularity === 'month' ? 'month' : 'day')
     } catch (err) {
       const msg =
         err?.response?.data?.message ||
@@ -50,6 +91,7 @@ function SalesReports() {
 
   const handleRangeChange = (values) => {
     setRange(values || [])
+
     if (!values || values.length !== 2) {
       fetchReports()
       return
@@ -97,7 +139,7 @@ function SalesReports() {
           <Col xs={24} md={12}>
             <Card>
               <Statistic
-                title="تعداد سفارشات پرداخت‌شده"
+                title="تعداد سفارش‌ها"
                 value={summary.ordersCount}
                 valueStyle={{ color: '#1890ff' }}
               />
@@ -110,9 +152,14 @@ function SalesReports() {
             <ResponsiveContainer>
               <LineChart data={series}>
                 <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="bucket" />
+                <XAxis
+                  dataKey="bucket"
+                  tickFormatter={(value) => formatPersianDate(value, granularity)}
+                />
                 <YAxis />
-                <Tooltip />
+                <Tooltip
+                  labelFormatter={(value) => formatPersianDate(value, granularity)}
+                />
                 <Line
                   type="monotone"
                   dataKey="totalSales"

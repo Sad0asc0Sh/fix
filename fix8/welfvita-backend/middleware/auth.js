@@ -89,5 +89,8 @@ const authorize = (...roles) => {
   }
 }
 
-module.exports = { protect, authorize }
+// میانبر برای مجوز ادمین (admin, manager, superadmin)
+const admin = authorize('admin', 'manager', 'superadmin')
+
+module.exports = { protect, authorize, admin }
 

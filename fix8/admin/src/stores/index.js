@@ -14,6 +14,8 @@ export const useAuthStore = create(
       setAuth: (user, token) =>
         set({ user, token, isAuthenticated: Boolean(user && token) }),
 
+      setUser: (user) => set({ user }),
+
       logout: () => set({ user: null, token: null, isAuthenticated: false }),
     }),
     { name: 'auth-storage' },
@@ -39,78 +41,52 @@ export const useDashboardStore = create((set) => ({
 }))
 
 // ========================
-// Notification store
+// Notification store (persisted)
 // ========================
-export const useNotificationStore = create((set) => ({
-  notifications: [
-    {
-      id: '1',
-      type: 'order',
-      title: 'New order received',
-      message: 'Order #12345 was placed',
-      // حدود ۵ دقیقه قبل
-      createdAt: Date.now() - 5 * 60 * 1000,
-      read: false,
-      link: '/orders',
-    },
-    {
-      id: '2',
-      type: 'stock',
-      title: 'Low stock alert',
-      message: 'Product X stock is low',
-      // حدود ۱ ساعت قبل
-      createdAt: Date.now() - 60 * 60 * 1000,
-      read: false,
-      link: '/inventory',
-    },
-    {
-      id: '3',
-      type: 'ticket',
-      title: 'New ticket',
-      message: 'Ticket #789 was created',
-      // حدود ۲ ساعت قبل
-      createdAt: Date.now() - 2 * 60 * 60 * 1000,
-      read: true,
-      link: '/tickets',
-    },
-  ],
+export const useNotificationStore = create(
+  persist(
+    (set) => ({
+      notifications: [],
 
-  // افزودن نوتیفیکیشن جدید (مثلاً برای یادداشت ادمین روی سفارش)
-  addNotification: (notification) =>
-    set((state) => {
-      const id = notification.id || String(Date.now())
-      const createdAt = notification.createdAt || Date.now()
+      // افزودن نوتیفیکیشن جدید (مثلاً برای یادداشت ادمین روی سفارش)
+      addNotification: (notification) =>
+        set((state) => {
+          const id = notification.id || String(Date.now())
+          const createdAt = notification.createdAt || Date.now()
 
-      const newNotification = {
-        id,
-        read: false,
-        ...notification,
-        createdAt,
-      }
+          const newNotification = {
+            id,
+            read: false,
+            ...notification,
+            createdAt,
+          }
 
-      return {
-        notifications: [newNotification, ...state.notifications],
-      }
+          return {
+            notifications: [newNotification, ...state.notifications],
+          }
+        }),
+
+      // حذف یک نوتیفیکیشن
+      deleteNotification: (id) =>
+        set((state) => ({
+          notifications: state.notifications.filter((n) => n.id !== id),
+        })),
+
+      markAsRead: (id) =>
+        set((state) => ({
+          notifications: state.notifications.map((n) =>
+            n.id === id ? { ...n, read: true } : n,
+          ),
+        })),
+
+      markAllAsRead: () =>
+        set((state) => ({
+          notifications: state.notifications.map((n) => ({ ...n, read: true })),
+        })),
     }),
-
-  // حذف یک نوتیفیکیشن
-  deleteNotification: (id) =>
-    set((state) => ({
-      notifications: state.notifications.filter((n) => n.id !== id),
-    })),
-
-  markAsRead: (id) =>
-    set((state) => ({
-      notifications: state.notifications.map((n) =>
-        n.id === id ? { ...n, read: true } : n,
-      ),
-    })),
-
-  markAllAsRead: () =>
-    set((state) => ({
-      notifications: state.notifications.map((n) => ({ ...n, read: true })),
-    })),
-}))
+    { name: 'notification-storage' },
+  ),
+)
 
 // ============================================
 // Category Store - Single Source of Truth

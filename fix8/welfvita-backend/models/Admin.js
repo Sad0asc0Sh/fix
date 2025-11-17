@@ -45,8 +45,14 @@ const UserSchema = new mongoose.Schema(
     },
 
     avatar: {
-      type: String,
-      default: null,
+      url: {
+        type: String,
+        default: null,
+      },
+      public_id: {
+        type: String,
+        default: null,
+      },
     },
 
     // فیلدهای بازنشانی رمز عبور

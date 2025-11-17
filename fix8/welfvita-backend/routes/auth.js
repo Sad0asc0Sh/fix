@@ -4,6 +4,9 @@ const jwt = require('jsonwebtoken')
 const crypto = require('crypto')
 const Admin = require('../models/Admin')
 const { sendResetPasswordEmail } = require('../utils/notificationService')
+const { protect } = require('../middleware/auth')
+const { upload } = require('../middleware/upload')
+const { updateMyProfile, updateMyAvatar } = require('../controllers/authController')
 
 // JWT configuration
 const JWT_SECRET =
@@ -360,6 +363,18 @@ router.put('/admin/reset-password/:token', async (req, res) => {
     })
   }
 })
+
+// ============================================
+// PUT /api/auth/me/update
+// به‌روزرسانی اطلاعات پروفایل (نام، ایمیل، رمز عبور)
+// ============================================
+router.put('/me/update', protect, updateMyProfile)
+
+// ============================================
+// PUT /api/auth/me/avatar
+// به‌روزرسانی آواتار کاربر
+// ============================================
+router.put('/me/avatar', protect, upload.single('avatar'), updateMyAvatar)
 
 module.exports = router
 

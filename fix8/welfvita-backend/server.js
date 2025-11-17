@@ -121,6 +121,10 @@ app.use('/api/pages', pageRoutes)
 const bannerRoutes = require('./routes/banners')
 app.use('/api/banners', bannerRoutes)
 
+// Announcements Routes
+const announcementRoutes = require('./routes/announcements')
+app.use('/api/announcements', announcementRoutes)
+
 // Dashboard Routes
 const dashboardRoutes = require('./routes/dashboard')
 app.use('/api/dashboard', dashboardRoutes)
