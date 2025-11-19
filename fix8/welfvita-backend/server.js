@@ -120,6 +120,10 @@ app.use('/api/tickets', ticketRoutes)
 const reviewRoutes = require('./routes/reviews')
 app.use('/api/reviews', reviewRoutes)
 
+// Sales Routes
+const saleRoutes = require('./routes/sales')
+app.use('/api/sales', saleRoutes)
+
 // Blog & CMS Routes
 const blogRoutes = require('./routes/blog')
 app.use('/api/blog', blogRoutes)

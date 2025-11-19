@@ -31,6 +31,7 @@ const CustomerProfile = lazy(() => import('./pages/customers/CustomerProfile'))
 
 // Finance
 const CouponsPage = lazy(() => import('./pages/finance/CouponsPage'))
+const SalesPage = lazy(() => import('./pages/finance/SalesPage'))
 const ShippingPage = lazy(() => import('./pages/finance/ShippingPage'))
 
 // Content
@@ -143,6 +144,7 @@ function App() {
 
                 {/* Finance */}
                 <Route path="/coupons" element={<CouponsPage />} />
+                <Route path="/sales" element={<SalesPage />} />
                 <Route path="/shipping" element={<ShippingPage />} />
 
                 {/* Content */}

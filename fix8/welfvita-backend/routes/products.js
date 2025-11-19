@@ -66,18 +66,13 @@ const getAllDescendantCategoryIds = async (parentId) => {
   return ids
 }
 
-// Helper to build filter object from query
+// Helper to build base filter object from query (without text search)
 const buildProductFilter = (query) => {
   const filter = {}
 
   // By default, only active products unless includeInactive=true
   if (!query.includeInactive) {
     filter.isActive = true
-  }
-
-  // Text search on name
-  if (query.search) {
-    filter.name = { $regex: query.search, $options: 'i' }
   }
 
   // Advanced filters like isActive[eq]=true
@@ -120,25 +115,28 @@ router.get('/', async (req, res) => {
     const sort = req.query.sort || '-createdAt'
     const fields = req.query.fields ? req.query.fields.split(',').join(' ') : undefined
 
-    let filter = buildProductFilter(req.query)
+    const baseFilter = buildProductFilter(req.query)
+    const conditions = []
+
+    if (Object.keys(baseFilter).length > 0) {
+      conditions.push(baseFilter)
+    }
 
     // productType filter (simple / variable)
     if (req.query.productType === 'variable') {
-      filter = {
-        ...filter,
+      conditions.push({
         productType: 'variable',
-      }
+      })
     } else if (req.query.productType === 'simple') {
       // برای سازگاری عقب‌رو: محصولاتی که productType ندارند هم ساده محسوب می‌شوند
-      filter = {
-        ...filter,
+      conditions.push({
         $or: [
           { productType: { $exists: false } },
           { productType: null },
           { productType: '' },
           { productType: 'simple' },
         ],
-      }
+      })
     }
 
     // Category filter with optional descendants
@@ -147,13 +145,28 @@ router.get('/', async (req, res) => {
         const ids = [req.query.category]
         const descendants = await getAllDescendantCategoryIds(req.query.category)
         ids.push(...descendants)
-        filter.category = { $in: ids }
+        conditions.push({ category: { $in: ids } })
       } else {
-        filter.category = req.query.category
+        conditions.push({ category: req.query.category })
       }
     }
 
-    const query = Product.find(filter).sort(sort).skip(skip).limit(limit)
+    // Text search on name or SKU (and variant SKU)
+    if (req.query.search) {
+      const regex = { $regex: req.query.search, $options: 'i' }
+      conditions.push({
+        $or: [{ name: regex }, { sku: regex }, { 'variants.sku': regex }],
+      })
+    }
+
+    const mongoFilter =
+      conditions.length === 0
+        ? {}
+        : conditions.length === 1
+          ? conditions[0]
+          : { $and: conditions }
+
+    const query = Product.find(mongoFilter).sort(sort).skip(skip).limit(limit)
 
     if (fields) {
       query.select(fields)
@@ -161,7 +174,7 @@ router.get('/', async (req, res) => {
 
     const [items, total] = await Promise.all([
       query.lean(),
-      Product.countDocuments(filter),
+      Product.countDocuments(mongoFilter),
     ])
 
     res.json({

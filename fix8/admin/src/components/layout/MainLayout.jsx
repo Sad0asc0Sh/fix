@@ -112,6 +112,10 @@ function MainLayout({ children }) {
           label: <Link to="/coupons">کدهای تخفیف</Link>,
         },
         {
+          key: '/sales',
+          label: <Link to="/sales">تخفیف‌های زمان‌دار</Link>,
+        },
+        {
           key: '/shipping',
           label: <Link to="/shipping">تنظیمات ارسال</Link>,
         },
